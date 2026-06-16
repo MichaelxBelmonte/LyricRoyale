@@ -50,5 +50,6 @@ Deliver, in order:
 ## 7. Working conventions
 - Re-read the relevant doc before each subtask; keep code consistent with the documented architecture and naming.
 - Small, reviewable commits. The guard: `.env.local` must always stay gitignored.
+- **Never run `next build` / `npm run check` while `next dev` is running** — they share the `.next` folder and the build corrupts the dev server's cache (causes `ENOENT routes-manifest.json` → HTTP 500 on every page). For a quick check while dev is up, use `npm run typecheck` (safe, touches nothing). Only run a full build with the dev server stopped. If you hit the 500: stop dev, `rm -rf .next`, restart dev.
 - Don't run destructive or irreversible actions without asking.
 - When Day 1 is done, **stop and summarize** what's built and what's next (Day 2: round engine + first no-mic modes + scoring + leaderboard).
