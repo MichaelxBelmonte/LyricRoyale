@@ -5,3 +5,9 @@
 :root {
   color-scheme: dark;
 }
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(220, 38, 38, 0.16), transparent 34rem),
+    #0a0a0a;
+}

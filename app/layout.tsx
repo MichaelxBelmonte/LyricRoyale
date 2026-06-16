@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
   title: "Lyric Royale",
-  description: "A party game powered by live Musixmatch lyrics.",
+  description: "A bilingual party game powered by live Musixmatch lyrics.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

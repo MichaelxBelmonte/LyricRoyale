@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchTracks } from "@/lib/server/musixmatch";
+import type { ErrorResponse, SearchResponse } from "@/lib/types";
 
 // Server-side proxy: the browser calls /api/mxm/search; MXM_KEY never leaves the server.
 export const runtime = "nodejs";
@@ -8,13 +9,21 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim();
   if (!q) {
-    return NextResponse.json({ error: "Missing query param 'q'." }, { status: 400 });
+    return NextResponse.json<ErrorResponse>(
+      { error: "Missing query param 'q'.", code: "missing_query" },
+      { status: 400 },
+    );
   }
+
   try {
     const results = await searchTracks(q);
-    return NextResponse.json({ results });
+    return NextResponse.json<SearchResponse>({ query: q, results });
   } catch (err) {
-    console.error("[/api/mxm/search]", err);
-    return NextResponse.json({ error: "Search failed. Please try again." }, { status: 502 });
+    const message = err instanceof Error ? err.message : "Unknown Musixmatch search error";
+    console.error("[mxm.search]", { message });
+    return NextResponse.json<ErrorResponse>(
+      { error: "Search failed. Please try again.", code: "provider_error" },
+      { status: 502 },
+    );
   }
 }

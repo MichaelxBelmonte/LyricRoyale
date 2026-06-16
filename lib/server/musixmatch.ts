@@ -1,50 +1,106 @@
-// SERVER-ONLY Musixmatch client.
-// Reads MXM_KEY from the environment. NEVER import this from a Client Component —
-// it must only be used inside route handlers / server actions so the key stays server-side.
+import "server-only";
+
 import type { TrackSummary } from "@/lib/types";
 
 const BASE = "https://api.musixmatch.com/ws/1.1";
 
-function apiKey(): string {
-  const k = process.env.MXM_KEY;
-  if (!k) throw new Error("MXM_KEY is not set in the environment");
-  return k;
+interface MusixmatchEnvelope<TBody> {
+  message?: {
+    header?: {
+      status_code?: number;
+    };
+    body?: TBody;
+  };
 }
 
-/** Low-level call. Returns message.body, throwing on transport or Musixmatch status errors. */
-async function call(method: string, params: Record<string, string | number>): Promise<any> {
-  const qs = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) qs.set(k, String(v));
-  qs.set("apikey", apiKey());
+interface RawTrack {
+  track_id?: number | string;
+  track_name?: string;
+  artist_name?: string;
+  has_lyrics?: number;
+  has_richsync?: number;
+}
 
-  const res = await fetch(`${BASE}/${method}?${qs.toString()}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Musixmatch HTTP ${res.status}`);
+interface SearchBody {
+  track_list?: Array<{
+    track?: RawTrack;
+  }>;
+}
 
-  const json = await res.json();
-  const status = json?.message?.header?.status_code;
-  if (status !== 200) throw new Error(`Musixmatch status_code ${status} for ${method}`);
+class MusixmatchProviderError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MusixmatchProviderError";
+  }
+}
+
+function apiKey(): string {
+  const key = process.env.MXM_KEY;
+  if (!key) throw new MusixmatchProviderError("MXM_KEY is not set in the environment");
+  return key;
+}
+
+async function callMusixmatch<TBody>(
+  method: string,
+  params: Record<string, string | number>,
+): Promise<TBody> {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    searchParams.set(key, String(value));
+  }
+  searchParams.set("apikey", apiKey());
+
+  const response = await fetch(`${BASE}/${method}?${searchParams.toString()}`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new MusixmatchProviderError(`Musixmatch HTTP ${response.status}`);
+  }
+
+  const json = (await response.json()) as MusixmatchEnvelope<TBody>;
+  const statusCode = json.message?.header?.status_code;
+  if (statusCode !== 200 || !json.message?.body) {
+    throw new MusixmatchProviderError(
+      `Musixmatch status_code ${statusCode ?? "unknown"} for ${method}`,
+    );
+  }
+
   return json.message.body;
 }
 
-/** Search tracks by free-text query. Returns only songs that have lyrics. */
+function toTrackSummary(rawTrack: RawTrack | undefined): TrackSummary | null {
+  if (!rawTrack) return null;
+
+  const trackId =
+    typeof rawTrack.track_id === "number" ? rawTrack.track_id : Number(rawTrack.track_id);
+  const trackName = rawTrack.track_name?.trim();
+  const artistName = rawTrack.artist_name?.trim();
+
+  if (!Number.isFinite(trackId) || !trackName || !artistName) {
+    return null;
+  }
+
+  return {
+    trackId,
+    trackName,
+    artistName,
+    hasLyrics: rawTrack.has_lyrics === 1,
+    hasRichsync: rawTrack.has_richsync === 1,
+  };
+}
+
 export async function searchTracks(query: string, limit = 8): Promise<TrackSummary[]> {
   // q_track_artist matches title+artist (not lyrics) and rating sort surfaces the
   // well-known version first — far better relevance for a song picker than a bare `q`.
-  const body = await call("track.search", {
+  const body = await callMusixmatch<SearchBody>("track.search", {
     q_track_artist: query,
     page_size: limit,
     s_track_rating: "desc",
     f_has_lyrics: 1,
   });
-  const list: any[] = body?.track_list ?? [];
-  return list.map((item) => {
-    const t = item.track;
-    return {
-      trackId: t.track_id,
-      trackName: t.track_name,
-      artistName: t.artist_name,
-      hasLyrics: t.has_lyrics === 1,
-      hasRichsync: t.has_richsync === 1,
-    } satisfies TrackSummary;
-  });
+
+  return (body.track_list ?? [])
+    .map((item) => toTrackSummary(item.track))
+    .filter((track): track is TrackSummary => track !== null);
 }

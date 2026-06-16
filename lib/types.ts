@@ -1,5 +1,7 @@
-// Shared types. Per COMPLIANCE: these values flow through the app transiently
-// for real-time display and are NEVER persisted (the MVP has no database).
+// Shared contracts used by route handlers and client components.
+// Musixmatch-derived values are transient display data in the MVP; do not persist them.
+
+export type Locale = "en" | "it";
 
 export interface TrackSummary {
   trackId: number;
@@ -10,5 +12,11 @@ export interface TrackSummary {
 }
 
 export interface SearchResponse {
+  query: string;
   results: TrackSummary[];
+}
+
+export interface ErrorResponse {
+  error: string;
+  code?: string;
 }
