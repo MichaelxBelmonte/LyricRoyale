@@ -3,17 +3,27 @@ import type { TrackSummary } from "@/lib/types";
 interface TrackResultsProps {
   results: TrackSummary[];
   searched: boolean;
+  loadingTrackId: number | null;
   labels: {
     emptyState: string;
     noResults: string;
     resultsTitle: string;
     resultMeta: string;
+    playButton: string;
+    loadingRound: string;
     richsyncBadge: string;
     lyricsBadge: string;
   };
+  onPlay: (track: TrackSummary) => void;
 }
 
-export default function TrackResults({ results, searched, labels }: TrackResultsProps) {
+export default function TrackResults({
+  results,
+  searched,
+  loadingTrackId,
+  labels,
+  onPlay,
+}: TrackResultsProps) {
   if (!searched) {
     return <p className="text-sm text-neutral-500">{labels.emptyState}</p>;
   }
@@ -41,21 +51,29 @@ export default function TrackResults({ results, searched, labels }: TrackResults
               <p className="truncate text-sm text-neutral-400">{track.artistName}</p>
               <p className="mt-1 text-xs text-neutral-500">{labels.resultMeta}</p>
             </div>
-            <div className="flex items-start gap-2 sm:justify-end">
-              {track.hasRichsync ? (
-                <span className="rounded bg-red-600/20 px-2 py-1 text-xs font-medium text-red-200">
-                  {labels.richsyncBadge}
-                </span>
-              ) : null}
-              {track.hasLyrics ? (
-                <span className="rounded bg-neutral-700/60 px-2 py-1 text-xs font-medium text-neutral-200">
-                  {labels.lyricsBadge}
-                </span>
-              ) : null}
+            <div className="flex flex-wrap items-start gap-2 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => onPlay(track)}
+                disabled={loadingTrackId !== null}
+                className="rounded bg-red-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loadingTrackId === track.trackId ? labels.loadingRound : labels.playButton}
+              </button>
+              {track.hasRichsync ? <Badge>{labels.richsyncBadge}</Badge> : null}
+              {track.hasLyrics ? <Badge>{labels.lyricsBadge}</Badge> : null}
             </div>
           </li>
         ))}
       </ul>
     </section>
+  );
+}
+
+function Badge({ children }: { children: string }) {
+  return (
+    <span className="rounded bg-neutral-700/60 px-2 py-1 text-xs font-medium text-neutral-200">
+      {children}
+    </span>
   );
 }

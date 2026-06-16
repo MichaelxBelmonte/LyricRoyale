@@ -2,10 +2,18 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import LanguageToggle from "@/components/LanguageToggle";
+import FinishLineGame from "@/components/rounds/FinishLineGame";
 import SearchForm from "@/components/search/SearchForm";
 import TrackResults from "@/components/search/TrackResults";
 import { copy, defaultLocale } from "@/lib/i18n";
-import type { ErrorResponse, Locale, SearchResponse, TrackSummary } from "@/lib/types";
+import type {
+  ErrorResponse,
+  FinishLineResponse,
+  FinishLineRound,
+  Locale,
+  SearchResponse,
+  TrackSummary,
+} from "@/lib/types";
 
 export default function SearchExperience() {
   const [locale, setLocale] = useState<Locale>(defaultLocale);
@@ -14,6 +22,10 @@ export default function SearchExperience() {
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [roundError, setRoundError] = useState<string | null>(null);
+  const [selectedTrack, setSelectedTrack] = useState<TrackSummary | null>(null);
+  const [round, setRound] = useState<FinishLineRound | null>(null);
+  const [loadingTrackId, setLoadingTrackId] = useState<number | null>(null);
 
   const text = copy[locale];
   const languageLabels = useMemo(
@@ -44,12 +56,41 @@ export default function SearchExperience() {
 
       setResults(payload.results ?? []);
       setSearched(true);
+      setRound(null);
+      setSelectedTrack(null);
+      setRoundError(null);
     } catch (err) {
       setResults([]);
       setSearched(true);
       setError(err instanceof Error ? err.message : text.errorFallback);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function startRound(track: TrackSummary) {
+    setSelectedTrack(track);
+    setRound(null);
+    setRoundError(null);
+    setLoadingTrackId(track.trackId);
+
+    try {
+      const response = await fetch("/api/rounds/finish-line", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackId: track.trackId }),
+      });
+      const payload = (await response.json()) as Partial<FinishLineResponse & ErrorResponse>;
+
+      if (!response.ok || !payload.round) {
+        throw new Error(payload.error ?? text.roundError);
+      }
+
+      setRound(payload.round);
+    } catch (err) {
+      setRoundError(err instanceof Error ? err.message : text.roundError);
+    } finally {
+      setLoadingTrackId(null);
     }
   }
 
@@ -80,7 +121,28 @@ export default function SearchExperience() {
 
           {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
-          <TrackResults results={results} searched={searched} labels={text} />
+          <TrackResults
+            results={results}
+            searched={searched}
+            loadingTrackId={loadingTrackId}
+            labels={text}
+            onPlay={startRound}
+          />
+
+          {roundError ? <p className="text-sm text-red-300">{roundError}</p> : null}
+
+          {round && selectedTrack ? (
+            <FinishLineGame
+              round={round}
+              track={selectedTrack}
+              labels={text}
+              onReset={() => {
+                setRound(null);
+                setSelectedTrack(null);
+                setRoundError(null);
+              }}
+            />
+          ) : null}
 
           <p className="border-t border-neutral-850 pt-4 text-xs leading-5 text-neutral-500">
             {text.complianceNote}

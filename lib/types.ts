@@ -11,9 +11,26 @@ export interface TrackSummary {
   hasRichsync: boolean;
 }
 
+export interface TrackingLinks {
+  pixel: string | null;
+  script: string | null;
+}
+
+export interface FinishLineRound {
+  trackId: number;
+  prompt: string;
+  answer: string;
+  copyright: string;
+  tracking: TrackingLinks;
+}
+
 export interface SearchResponse {
   query: string;
   results: TrackSummary[];
+}
+
+export interface FinishLineResponse {
+  round: FinishLineRound;
 }
 
 export interface ErrorResponse {

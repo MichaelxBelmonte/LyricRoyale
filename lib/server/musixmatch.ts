@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { TrackSummary } from "@/lib/types";
+import type { TrackingLinks, TrackSummary } from "@/lib/types";
 
 const BASE = "https://api.musixmatch.com/ws/1.1";
 
@@ -25,6 +25,23 @@ interface SearchBody {
   track_list?: Array<{
     track?: RawTrack;
   }>;
+}
+
+interface RawLyrics {
+  lyrics_body?: string;
+  lyrics_copyright?: string;
+  pixel_tracking_url?: string;
+  script_tracking_url?: string;
+}
+
+interface LyricsBody {
+  lyrics?: RawLyrics;
+}
+
+export interface LyricsPayload {
+  body: string;
+  copyright: string;
+  tracking: TrackingLinks;
 }
 
 class MusixmatchProviderError extends Error {
@@ -103,4 +120,23 @@ export async function searchTracks(query: string, limit = 8): Promise<TrackSumma
   return (body.track_list ?? [])
     .map((item) => toTrackSummary(item.track))
     .filter((track): track is TrackSummary => track !== null);
+}
+
+export async function getTrackLyrics(trackId: number): Promise<LyricsPayload> {
+  const body = await callMusixmatch<LyricsBody>("track.lyrics.get", { track_id: trackId });
+  const lyrics = body.lyrics;
+  const lyricsBody = lyrics?.lyrics_body?.trim();
+
+  if (!lyrics || !lyricsBody) {
+    throw new MusixmatchProviderError(`No lyrics body for track ${trackId}`);
+  }
+
+  return {
+    body: lyricsBody,
+    copyright: lyrics.lyrics_copyright?.trim() ?? "Lyrics provided by Musixmatch",
+    tracking: {
+      pixel: lyrics.pixel_tracking_url ?? null,
+      script: lyrics.script_tracking_url ?? null,
+    },
+  };
 }
