@@ -20,8 +20,8 @@ export default function LanguageToggle({ locale, labels, onChange }: LanguageTog
 
   return (
     <div className="inline-flex items-center gap-2 text-xs font-medium text-neutral-400">
-      <span className="hidden uppercase tracking-[0.18em] sm:inline">{labels.toggle}</span>
-      <div className="grid grid-cols-2 gap-0.5 rounded-full border border-neutral-800 bg-neutral-900/80 p-0.5 backdrop-blur">
+      <span className="hidden uppercase tracking-wider sm:inline">{labels.toggle}</span>
+      <div className="grid grid-cols-2 gap-0.5 rounded-md border border-neutral-800 bg-neutral-925 p-0.5">
         {options.map((option) => {
           const active = locale === option.value;
           return (
@@ -32,9 +32,9 @@ export default function LanguageToggle({ locale, labels, onChange }: LanguageTog
               aria-pressed={active}
               onClick={() => onChange(option.value)}
               className={[
-                "rounded-full px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wide transition",
+                "rounded px-3 py-1 font-mono text-xs font-medium uppercase tracking-wide transition-colors",
                 active
-                  ? "bg-brand text-white shadow-glow"
+                  ? "bg-brand text-white"
                   : "text-neutral-400 hover:text-white",
               ].join(" ")}
             >

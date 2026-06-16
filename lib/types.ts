@@ -11,18 +11,34 @@ export interface TrackSummary {
   hasRichsync: boolean;
 }
 
+export interface SingerTeam {
+  playerName: string;
+  teamName: string;
+  artists: string[];
+}
+
 export interface TrackingLinks {
   pixel: string | null;
   script: string | null;
+}
+
+// Richsync timing for "The Drop": the line karaoke-highlights word-by-word toward
+// the blank. Contains ONLY the prefix tokens (before the blank) — never the answer
+// word — plus the offset where the blank lands. Present only when a richsync line
+// matches the chosen lyric line; otherwise the round plays with a static blank.
+export interface FinishLineDrop {
+  tokens: RichsyncToken[];
+  dropOffset: number;
+  lineDuration: number;
 }
 
 export interface FinishLineRound {
   trackId: number;
   seed: number;
   prompt: string;
-  answer: string;
   copyright: string;
   tracking: TrackingLinks;
+  drop?: FinishLineDrop;
 }
 
 export interface RichsyncToken {
@@ -51,6 +67,14 @@ export interface SearchResponse {
 
 export interface FinishLineResponse {
   round: FinishLineRound;
+}
+
+// Server-side answer check — the answer never ships in the round payload; the
+// client submits a guess and the server validates it and reveals the answer
+// only at resolution.
+export interface CheckResponse {
+  correct: boolean;
+  answer: string;
 }
 
 export interface RichsyncResponse {

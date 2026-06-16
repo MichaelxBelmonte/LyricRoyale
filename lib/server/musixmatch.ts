@@ -203,3 +203,13 @@ export async function getRichsyncPreview(trackId: number): Promise<RichsyncPrevi
     tracking: toTracking(richsync),
   };
 }
+
+// All parsed richsync lines for a track (word-level synced). Used to build "The
+// Drop" timing. Throws if the track has no richsync (the caller treats that as
+// "no drop" and plays a static blank).
+export async function getRichsyncLines(trackId: number): Promise<RichsyncLine[]> {
+  const body = await callMusixmatch<RichsyncBody>("track.richsync.get", { track_id: trackId });
+  const richsyncBody = body.richsync?.richsync_body?.trim();
+  if (!richsyncBody) return [];
+  return parseRichsyncLines(richsyncBody);
+}

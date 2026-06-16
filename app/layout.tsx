@@ -1,18 +1,18 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { Anton, Hanken_Grotesk } from "next/font/google";
-
-const display = Anton({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-});
+import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 
 const sans = Hanken_Grotesk({
   subsets: ["latin"],
   variable: "--font-sans",
+  display: "swap",
+});
+
+// Monospace for numbers, timers, scores and code-like labels — the "tech" register.
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
   display: "swap",
 });
 
@@ -35,7 +35,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${sans.variable}`}>
+    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
       <body className="min-h-screen bg-neutral-950 font-sans text-neutral-100 antialiased">
         {children}
       </body>
