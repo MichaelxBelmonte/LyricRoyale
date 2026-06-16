@@ -13,30 +13,35 @@ interface LanguageToggleProps {
 }
 
 export default function LanguageToggle({ locale, labels, onChange }: LanguageToggleProps) {
+  const options: Array<{ value: Locale; short: string; full: string }> = [
+    { value: "en", short: "EN", full: labels.english },
+    { value: "it", short: "IT", full: labels.italian },
+  ];
+
   return (
-    <div className="inline-flex items-center gap-2 text-sm text-neutral-400">
-      <span>{labels.toggle}</span>
-      <div className="grid grid-cols-2 rounded-md border border-neutral-800 bg-neutral-950 p-1">
-        <button
-          type="button"
-          onClick={() => onChange("en")}
-          className={[
-            "rounded px-3 py-1 transition",
-            locale === "en" ? "bg-red-600 text-white" : "text-neutral-400 hover:text-white",
-          ].join(" ")}
-        >
-          EN
-        </button>
-        <button
-          type="button"
-          onClick={() => onChange("it")}
-          className={[
-            "rounded px-3 py-1 transition",
-            locale === "it" ? "bg-red-600 text-white" : "text-neutral-400 hover:text-white",
-          ].join(" ")}
-        >
-          IT
-        </button>
+    <div className="inline-flex items-center gap-2 text-xs font-medium text-neutral-400">
+      <span className="hidden uppercase tracking-[0.18em] sm:inline">{labels.toggle}</span>
+      <div className="grid grid-cols-2 gap-0.5 rounded-full border border-neutral-800 bg-neutral-900/80 p-0.5 backdrop-blur">
+        {options.map((option) => {
+          const active = locale === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              aria-label={option.full}
+              aria-pressed={active}
+              onClick={() => onChange(option.value)}
+              className={[
+                "rounded-full px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wide transition",
+                active
+                  ? "bg-brand text-white shadow-glow"
+                  : "text-neutral-400 hover:text-white",
+              ].join(" ")}
+            >
+              {option.short}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -75,25 +75,38 @@ export default function LiveLyricPreview({ trackId, enabled, labels }: LiveLyric
   }, [preview?.tracking.script]);
 
   return (
-    <section className="rounded-md border border-neutral-850 bg-neutral-950 p-4">
+    <section className="rounded-2xl border border-neutral-850 bg-neutral-950/70 p-4 sm:p-5">
       {preview?.tracking.pixel ? (
         <img alt="" className="hidden" referrerPolicy="no-referrer" src={preview.tracking.pixel} />
       ) : null}
 
-      <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-        {labels.richsyncTitle}
-      </p>
+      <div className="flex items-center gap-2">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand/70" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-brand" />
+        </span>
+        <p className="font-display text-xs uppercase tracking-[0.2em] text-neutral-400">
+          {labels.richsyncTitle}
+        </p>
+      </div>
 
       {loading ? <p className="mt-3 text-sm text-neutral-500">{labels.richsyncLoading}</p> : null}
       {error ? <p className="mt-3 text-sm text-neutral-500">{error}</p> : null}
 
       {preview ? (
         <>
-          <p className="mt-3 text-lg leading-8 text-neutral-500">
+          <p className="mt-4 text-xl font-semibold leading-9 sm:text-2xl">
             {preview.line.tokens.map((token, index) => (
               <span
                 key={`${token.offset}-${index}`}
-                className={index <= activeIndex ? "text-white" : undefined}
+                className={[
+                  "transition-colors duration-150",
+                  index === activeIndex
+                    ? "text-brand-300"
+                    : index < activeIndex
+                      ? "text-white"
+                      : "text-neutral-600",
+                ].join(" ")}
               >
                 {token.text}
               </span>

@@ -36,32 +36,32 @@ export default function TrackResults({
     <section aria-labelledby="search-results-title" className="space-y-3">
       <h2
         id="search-results-title"
-        className="text-sm font-semibold uppercase tracking-wider text-neutral-400"
+        className="font-display text-sm uppercase tracking-[0.2em] text-neutral-400"
       >
         {labels.resultsTitle}
       </h2>
-      <ul className="space-y-2">
-        {results.map((track) => (
+      <ul className="space-y-2.5">
+        {results.map((track, index) => (
           <li
             key={track.trackId}
-            className="grid gap-3 rounded-md border border-neutral-850 bg-neutral-900/80 p-4 sm:grid-cols-[1fr_auto]"
+            style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
+            className="group grid animate-fade-up gap-3 rounded-2xl border border-neutral-850 bg-neutral-900/60 p-4 transition hover:border-brand/40 hover:bg-neutral-900 sm:grid-cols-[1fr_auto] sm:items-center"
           >
             <div className="min-w-0">
               <p className="truncate font-semibold text-white">{track.trackName}</p>
               <p className="truncate text-sm text-neutral-400">{track.artistName}</p>
-              <p className="mt-1 text-xs text-neutral-500">{labels.resultMeta}</p>
             </div>
-            <div className="flex flex-wrap items-start gap-2 sm:justify-end">
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              {track.hasRichsync ? <Badge tone="brand">{labels.richsyncBadge}</Badge> : null}
+              {track.hasLyrics ? <Badge>{labels.lyricsBadge}</Badge> : null}
               <button
                 type="button"
                 onClick={() => onPlay(track)}
                 disabled={loadingTrackId !== null}
-                className="rounded bg-red-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-400 hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-none"
               >
                 {loadingTrackId === track.trackId ? labels.loadingRound : labels.playButton}
               </button>
-              {track.hasRichsync ? <Badge>{labels.richsyncBadge}</Badge> : null}
-              {track.hasLyrics ? <Badge>{labels.lyricsBadge}</Badge> : null}
             </div>
           </li>
         ))}
@@ -70,9 +70,14 @@ export default function TrackResults({
   );
 }
 
-function Badge({ children }: { children: string }) {
+function Badge({ children, tone }: { children: string; tone?: "brand" }) {
   return (
-    <span className="rounded bg-neutral-700/60 px-2 py-1 text-xs font-medium text-neutral-200">
+    <span
+      className={[
+        "rounded-full px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide",
+        tone === "brand" ? "bg-brand/15 text-brand-300" : "bg-neutral-800 text-neutral-300",
+      ].join(" ")}
+    >
       {children}
     </span>
   );
