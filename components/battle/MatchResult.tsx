@@ -1,3 +1,6 @@
+import Button from "@/components/brand/Button";
+import JCard from "@/components/brand/JCard";
+import Sticker from "@/components/brand/Sticker";
 import type { SingerTeam, TrackSummary } from "@/lib/types";
 
 interface MatchResultProps {
@@ -19,7 +22,13 @@ interface MatchResultProps {
     performanceMid: string;
     performanceLow: string;
     pointsLabel: string;
+    challengeFriend: string;
+    copyLink: string;
+    linkCopied: string;
   };
+  shareUrl?: string;
+  copied?: boolean;
+  onCopyLink?: () => void;
   onRematch: () => void;
   onNewSong: () => void;
 }
@@ -31,6 +40,9 @@ export default function MatchResult({
   roundsPlayed,
   maxRounds,
   bestStreak,
+  shareUrl,
+  copied,
+  onCopyLink,
   labels,
   onRematch,
   onNewSong,
@@ -44,47 +56,45 @@ export default function MatchResult({
         : labels.performanceLow;
 
   return (
-    <section className="animate-pop-in rounded-lg border border-neutral-850 bg-neutral-925 p-4 shadow-card sm:p-6">
-      <p className="font-mono text-xs uppercase tracking-[0.2em] text-brand">
-        {labels.matchCompleteTitle}
-      </p>
-      <div className="mt-3 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
-        <div className="min-w-0">
-          <h2 className="font-display text-3xl font-bold uppercase tracking-tight text-white sm:text-4xl">
-            {rank}
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
-            {labels.matchCompleteBody}
-          </p>
-          <p className="mt-4 truncate text-sm text-neutral-500">
-            {team.teamName} vs {track.trackName} - {track.artistName}
-          </p>
+    <div className="animate-pop-in">
+      <JCard spine="MATCH · COMPLETE" contentClassName="p-5 sm:p-7">
+        <Sticker tone="yellow" rotate={-3}>
+          {labels.matchCompleteTitle}
+        </Sticker>
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div className="min-w-0">
+            <h2 className="font-condensed text-3xl uppercase tracking-tight text-[#0b0b0b] sm:text-4xl">
+              {rank}
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">{labels.matchCompleteBody}</p>
+            <p className="mt-3 truncate text-sm text-black/45">
+              {team.teamName} vs {track.trackName} — {track.artistName}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <ResultStat label={labels.finalScoreLabel} value={score} suffix={labels.pointsLabel} />
+            <ResultStat label={labels.bestStreakLabel} value={bestStreak} />
+            <ResultStat label={labels.roundsPlayedLabel} value={`${roundsPlayed}/${maxRounds}`} />
+          </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
-          <ResultStat label={labels.finalScoreLabel} value={score} suffix={labels.pointsLabel} />
-          <ResultStat label={labels.bestStreakLabel} value={bestStreak} />
-          <ResultStat label={labels.roundsPlayedLabel} value={`${roundsPlayed}/${maxRounds}`} />
-        </div>
-      </div>
+        {shareUrl ? (
+          <Button onClick={onCopyLink} variant="magenta" full className="mt-5">
+            {copied ? labels.linkCopied : labels.challengeFriend}
+          </Button>
+        ) : null}
 
-      <div className="mt-5 grid gap-2 sm:grid-cols-[auto_auto]">
-        <button
-          type="button"
-          onClick={onRematch}
-          className="h-12 rounded-md bg-brand px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-400"
-        >
-          {labels.rematchSong}
-        </button>
-        <button
-          type="button"
-          onClick={onNewSong}
-          className="h-12 rounded-md border border-neutral-800 px-5 text-sm font-semibold text-neutral-300 transition-colors hover:border-neutral-700 hover:text-white"
-        >
-          {labels.pickAnotherSong}
-        </button>
-      </div>
-    </section>
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Button onClick={onRematch} full>
+            {labels.rematchSong}
+          </Button>
+          <Button onClick={onNewSong} variant="outlineDark" full>
+            {labels.pickAnotherSong}
+          </Button>
+        </div>
+      </JCard>
+    </div>
   );
 }
 
@@ -98,13 +108,13 @@ function ResultStat({
   suffix?: string;
 }) {
   return (
-    <div className="rounded-md border border-neutral-850 bg-neutral-950 px-3 py-2 text-right">
-      <p className="truncate font-mono text-[0.6rem] uppercase tracking-[0.18em] text-neutral-500">
+    <div className="rounded-lg border border-black/10 bg-white/60 px-2.5 py-2">
+      <p className="font-mono text-[0.55rem] uppercase leading-tight tracking-[0.1em] text-black/45">
         {label}
       </p>
-      <p className="mt-1 truncate font-mono text-xl tabular-nums text-white">
+      <p className="mt-1 font-mono text-base tabular-nums text-[#0b0b0b]">
         {value}
-        {suffix ? <span className="ml-1 text-sm text-neutral-500">{suffix}</span> : null}
+        {suffix ? <span className="ml-0.5 text-xs text-black/45">{suffix}</span> : null}
       </p>
     </div>
   );

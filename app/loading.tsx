@@ -1,0 +1,25 @@
+/**
+ * Route-level loading screen (App Router Suspense fallback). Brand-consistent:
+ * the cassette logomark spins inside a neon ring under the wordmark.
+ */
+export default function Loading() {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-7 bg-[#0b0b0b]">
+      <div className="relative h-20 w-20">
+        <span className="absolute inset-0 animate-spin rounded-full border-2 border-[#ff007f]/25 border-t-[#ff007f] [animation-duration:1.1s]" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/logomark.png"
+          alt=""
+          aria-hidden
+          className="absolute inset-[0.6rem] h-[3.55rem] w-[3.55rem] rounded-xl shadow-[0_0_24px_-4px_rgba(255,0,127,0.6)]"
+        />
+      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brand/wordmark.png" alt="Soundclash" className="h-6 w-auto opacity-90" />
+      <p className="animate-pulse font-mono text-[0.6rem] uppercase tracking-[0.32em] text-neutral-500">
+        Loading the clash…
+      </p>
+    </div>
+  );
+}

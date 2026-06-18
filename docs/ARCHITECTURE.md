@@ -1,8 +1,10 @@
 # System Architecture
 
-Lyric Royale is a web party game built on real song lyrics with an AI host, for the Musixmatch Musicathon 2026. This document describes how the system is structured: the trust boundary between the browser and the providers, the App Router folder layout, the end-to-end data flow for one round, the async-challenge model, state management, and the rationale behind each technology choice.
+Soundclash is a web party game built on real song lyrics with an AI host, for the Musixmatch Musicathon 2026. This document describes how the system is structured: the trust boundary between the browser and the providers, the App Router folder layout, the end-to-end data flow for one round, room state, and the rationale behind each technology choice.
 
-This is the engineering source of truth for *how the pieces fit together*. For *what* the product does, see [PRODUCT_SPEC.md](./PRODUCT_SPEC.md). For *when* each piece gets built, see [BUILD_PLAN.md](./BUILD_PLAN.md). For the exact Claude prompts referenced below, see [PROMPTS.md](./PROMPTS.md).
+This is the engineering source of truth for *how the pieces fit together*. For *what* the product does, see [PRODUCT_SPEC.md](./PRODUCT_SPEC.md). For visual implementation rules, see [BRAND_SYSTEM.md](./BRAND_SYSTEM.md). For the current room/autopilot plan, see [PARTY_ROOM_PLAN.md](./PARTY_ROOM_PLAN.md).
+
+> Current implementation note: the app has already pivoted from a primarily async challenge MVP to a Jackbox-style shared-room show. Some Supabase/Claude sections below remain the target architecture for persistence, leaderboards, mood-aware generation, and richer host banter.
 
 ---
 
@@ -246,17 +248,24 @@ Browser (play screen)        Next.js server (proxy)            Providers / Supab
 This is the canonical TypeScript shape returned by `POST /api/round` and consumed by the mode components. It carries the lyric-derived `prompt`/`options`/`answer` only in memory and only for the duration of the round.
 
 ```ts
-type RoundType = "finish_line" | "next_line" | "name_song" | "misheard" | "speed";
+type RoundType =
+  | "finish_line"
+  | "the_drop"
+  | "next_line"
+  | "artist_pick"
+  | "word_rush"
+  | "name_song";
 
 interface Round {
   id: string;
   gameId: string;
   trackId: string;
-  lineIndex: number;
+  lineIndex?: number;
   type: RoundType;
   prompt: string;
   options?: string[];
-  answer: string | number;
+  answer: string;
+  drop?: FinishLineDrop;
   timeLimitMs: number;
   copyright: string;
 }
@@ -273,7 +282,10 @@ interface Round {
 | `copyright` string | No (re-fetched with the lyrics) | Shown transiently |
 | Player result (`points`, `accuracy`, `mode`) | Yes | `scores` table |
 
-Because the answer text is never stored, two players hitting the *same* round reference (same `track_id` + `line_index` + `round_type` + `seed`) deterministically reconstruct the same round via a live fetch + a seeded Claude generation — no lyric text changes hands through the database. This is what makes async challenges (§5) safe.
+Because the answer text is never stored, the server reconstructs each playable
+round from a track reference, a mini-game type, and a seed via a live Musixmatch
+fetch plus deterministic server-side round logic. No lyric text changes hands
+through persistence.
 
 ### Why Claude derives mood/theme
 
@@ -281,9 +293,28 @@ Because the answer text is never stored, two players hitting the *same* round re
 
 ---
 
-## 5. Async-Challenge Flow via `share_slug` (no realtime multiplayer)
+## 5. Shared-Room Flow
 
-Lyric Royale has **no realtime multiplayer**. There are no sockets, no presence, no shared game state ticking between players. The social loop is fully asynchronous: you play, you get a score, you share a slug link, and friends try to beat you on **the same rounds** later.
+Current Soundclash is a Jackbox-style shared room:
+
+- `/host/new` creates a session.
+- `/host/[code]` is the TV/stage screen.
+- `/join` binds a phone to the room.
+- `/player/[code]` is the phone controller.
+- `POST /api/sessions/[code]/round` starts or auto-advances a round.
+- `PATCH /api/sessions/[code]/round` submits a player answer.
+- `PATCH /api/sessions/[code]` reveals results or returns to lobby.
+
+The current implementation uses a server-side in-memory store for the active
+session. The target implementation is Supabase Realtime Broadcast/Presence plus
+reference-only persistence for sessions, players, rounds, answers, and scores.
+
+### Future async challenge extension
+
+Async challenge links remain a future social loop: play a set, share a slug, and
+friends replay the same reference set later. This should reuse the same
+references-only rule: share `track_id`, `round_type`, `seed`, and position, never
+lyric text.
 
 ### How it works
 
@@ -341,7 +372,7 @@ create table profiles (
 -- games: a created game with a mode and config
 create table games (
   id          uuid primary key default gen_random_uuid(),
-  mode        text check (mode in ('finish_line','next_line','name_song','misheard','speed','karaoke')),
+  mode        text check (mode in ('finish_line','the_drop','next_line','artist_pick','word_rush','name_song','karaoke')),
   created_by  uuid references profiles,
   config      jsonb,
   created_at  timestamptz default now()

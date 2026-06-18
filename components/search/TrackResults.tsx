@@ -45,11 +45,11 @@ export default function TrackResults({
           <li
             key={track.trackId}
             style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
-            className="group grid animate-fade-up gap-3 rounded-md border border-neutral-850 bg-neutral-950 p-3.5 transition-colors hover:border-neutral-700 sm:grid-cols-[1fr_auto] sm:items-center"
+            className="group grid grid-cols-1 animate-fade-up gap-3 rounded-xl border border-black/10 bg-white p-3.5 transition-colors hover:border-[#ff007f]/40 sm:grid-cols-[1fr_auto] sm:items-center"
           >
             <div className="min-w-0">
-              <p className="truncate font-medium text-white">{track.trackName}</p>
-              <p className="truncate text-sm text-neutral-400">{track.artistName}</p>
+              <p className="truncate font-semibold text-[#0b0b0b]">{track.trackName}</p>
+              <p className="truncate text-sm text-black/50">{track.artistName}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               {track.hasRichsync ? <Badge tone="brand">{labels.richsyncBadge}</Badge> : null}
@@ -58,7 +58,8 @@ export default function TrackResults({
                 type="button"
                 onClick={() => onPlay(track)}
                 disabled={loadingTrackId !== null}
-                className="h-9 rounded-md bg-brand px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-400 disabled:cursor-not-allowed disabled:bg-neutral-850 disabled:text-neutral-600"
+                style={{ backgroundColor: "#ff007f" }}
+                className="inline-flex h-11 items-center justify-center rounded-lg px-5 font-condensed text-sm uppercase tracking-[0.04em] text-white transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loadingTrackId === track.trackId ? labels.loadingRound : labels.playButton}
               </button>
@@ -75,9 +76,7 @@ function Badge({ children, tone }: { children: string; tone?: "brand" }) {
     <span
       className={[
         "rounded border px-2 py-0.5 font-mono text-[0.65rem] uppercase tracking-[0.1em]",
-        tone === "brand"
-          ? "border-brand/40 text-brand-300"
-          : "border-neutral-800 text-neutral-400",
+        tone === "brand" ? "border-[#ff007f]/40 text-[#d80069]" : "border-black/15 text-black/50",
       ].join(" ")}
     >
       {children}

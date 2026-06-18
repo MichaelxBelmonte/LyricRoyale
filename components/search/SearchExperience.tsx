@@ -1,14 +1,24 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import BottomNav, { type BottomNavItem } from "@/components/app/BottomNav";
 import TopBar from "@/components/app/TopBar";
+import DuelResult from "@/components/battle/DuelResult";
 import MatchResult from "@/components/battle/MatchResult";
+import JCard from "@/components/brand/JCard";
 import Soundcheck from "@/components/onboarding/Soundcheck";
 import FinishLineGame from "@/components/rounds/FinishLineGame";
 import SearchForm from "@/components/search/SearchForm";
 import TrackResults from "@/components/search/TrackResults";
 import TeamSummary from "@/components/team/TeamSummary";
+import {
+  decodeChallenge,
+  encodeChallenge,
+  headToHead,
+  type Challenge,
+  type ChallengeRoundResult,
+} from "@/lib/game/challenge";
+import { randomStageName } from "@/lib/game/identity";
 import { ROUNDS_PER_SET } from "@/lib/game/scoring";
 import { copy, defaultLocale } from "@/lib/i18n";
 import type {
@@ -18,6 +28,7 @@ import type {
   Locale,
   SearchResponse,
   SingerTeam,
+  TrackResponse,
   TrackSummary,
 } from "@/lib/types";
 
@@ -46,6 +57,11 @@ export default function SearchExperience() {
   const [completedRounds, setCompletedRounds] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
+  const [roundResults, setRoundResults] = useState<ChallengeRoundResult[]>([]);
+  const [challenge, setChallenge] = useState<Challenge | null>(null);
+  const [booting, setBooting] = useState(false);
+  const [bootError, setBootError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const text = copy[locale];
   const languageLabels = useMemo(
@@ -65,6 +81,8 @@ export default function SearchExperience() {
     setCompletedRounds(0);
     setCurrentStreak(0);
     setBestStreak(0);
+    setRoundResults([]);
+    setCopied(false);
   }
 
   async function searchFor(rawQuery: string) {
@@ -151,11 +169,15 @@ export default function SearchExperience() {
     void loadRound(selectedTrack, nextRoundNumber - 1);
   }
 
-  function handleScored(points: number) {
-    setTotalScore((current) => current + points);
+  function handleScored(outcome: { points: number; correct: boolean; elapsedMs: number }) {
+    setRoundResults((current) => [
+      ...current,
+      { hit: outcome.correct, elapsedMs: outcome.elapsedMs, points: outcome.points },
+    ]);
+    setTotalScore((current) => current + outcome.points);
     setCompletedRounds((current) => Math.min(MATCH_ROUNDS, current + 1));
     setCurrentStreak((current) => {
-      const nextStreak = points > 0 ? current + 1 : 0;
+      const nextStreak = outcome.correct ? current + 1 : 0;
       setBestStreak((best) => Math.max(best, nextStreak));
       return nextStreak;
     });
@@ -164,11 +186,61 @@ export default function SearchExperience() {
   function backToLobby() {
     resetMatch();
     setSelectedTrack(null);
-    setScreen("lobby");
+    setChallenge(null);
+    setScreen(team ? "lobby" : "onboarding");
   }
 
   function editTeam() {
     setScreen("onboarding");
+  }
+
+  // Boot a challenge link (?c=...): rebuild the track from its id, auto-assign an
+  // identity, and drop straight into the duel against the encoded ghost.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const token = new URLSearchParams(window.location.search).get("c");
+    if (!token) return;
+    const decoded = decodeChallenge(token);
+    if (!decoded) {
+      setBootError(copy[defaultLocale].challengeError);
+      return;
+    }
+    setChallenge(decoded);
+    setBooting(true);
+    (async () => {
+      try {
+        const response = await fetch(`/api/mxm/track?trackId=${decoded.trackId}`);
+        const payload = (await response.json()) as Partial<TrackResponse & ErrorResponse>;
+        if (!response.ok || !payload.track) throw new Error();
+        const track = payload.track;
+        setTeam({ playerName: randomStageName(), teamName: "Challenger", artists: [track.artistName] });
+        setActiveArtist(track.artistName);
+        startRound(track);
+      } catch {
+        setChallenge(null);
+        setBootError(copy[defaultLocale].challengeError);
+      } finally {
+        setBooting(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const shareUrl = useMemo(() => {
+    if (typeof window === "undefined" || !selectedTrack || roundResults.length === 0) return "";
+    const token = encodeChallenge({
+      v: 1,
+      trackId: selectedTrack.trackId,
+      name: team?.playerName ?? "Player",
+      rounds: roundResults,
+      total: totalScore,
+    });
+    return `${window.location.origin}${window.location.pathname}?c=${token}`;
+  }, [selectedTrack, roundResults, team, totalScore]);
+
+  function copyShareLink() {
+    if (!shareUrl || typeof navigator === "undefined") return;
+    void navigator.clipboard?.writeText(shareUrl).then(() => setCopied(true)).catch(() => {});
   }
 
   const navItems: BottomNavItem[] = [
@@ -179,16 +251,18 @@ export default function SearchExperience() {
 
   function onNavSelect(key: string) {
     if (key === "exit") {
-      editTeam();
+      // Leave the solo session and return to the landing.
+      window.location.href = "/";
       return;
     }
     setLobbyTab(key as LobbyTab);
   }
 
   const showBack = screen === "game" || screen === "result";
+  const ghost = challenge ? (challenge.rounds[roundNumber - 1] ?? null) : null;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]">
       <TopBar
         locale={locale}
         languageLabels={languageLabels}
@@ -199,14 +273,25 @@ export default function SearchExperience() {
       />
 
       <main className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6">
-        {screen === "onboarding" ? (
+        {booting ? (
+          <div className="flex min-h-[50vh] items-center justify-center font-mono text-sm text-neutral-500">
+            {text.challengeLoading}…
+          </div>
+        ) : null}
+
+        {!booting && screen === "onboarding" ? (
           <div className="mx-auto w-full max-w-2xl">
+            {bootError ? (
+              <p className="mb-4 rounded-md border border-brand/30 bg-brand/5 px-4 py-3 text-sm text-brand-300">
+                {bootError}
+              </p>
+            ) : null}
             <Soundcheck initialTeam={team} labels={text} onStart={startSession} />
           </div>
         ) : null}
 
-        {screen === "lobby" && team ? (
-          <div className="grid gap-4 pb-24 lg:grid-cols-[20rem_1fr] lg:pb-0">
+        {!booting && screen === "lobby" && team ? (
+          <div className="grid grid-cols-1 gap-4 pb-24 lg:grid-cols-[20rem_1fr] lg:pb-0">
             <div className={lobbyTab === "team" ? "block" : "hidden lg:block"}>
               <TeamSummary
                 team={team}
@@ -218,12 +303,12 @@ export default function SearchExperience() {
             </div>
 
             <div className={lobbyTab === "songs" ? "block" : "hidden lg:block"}>
-              <section className="space-y-4 rounded-2xl border border-neutral-850 bg-neutral-900/60 p-4 sm:p-5">
+              <JCard contentClassName="space-y-4 p-4 sm:p-5">
                 <div>
-                  <p className="font-display text-sm uppercase tracking-[0.2em] text-white">
+                  <p className="font-condensed text-sm uppercase tracking-[0.2em] text-[#0b0b0b]">
                     {text.songLobbyTitle}
                   </p>
-                  <p className="mt-1 text-sm text-neutral-500">
+                  <p className="mt-1 text-sm text-black/50">
                     {activeArtist ? `${text.activeArtistLabel}: ${activeArtist}` : text.songLobbyHint}
                   </p>
                 </div>
@@ -236,7 +321,7 @@ export default function SearchExperience() {
                   onSubmit={handleSearch}
                 />
 
-                {error ? <p className="text-sm text-brand-300">{error}</p> : null}
+                {error ? <p className="text-sm font-semibold text-[#d80069]">{error}</p> : null}
 
                 <TrackResults
                   results={results}
@@ -246,15 +331,15 @@ export default function SearchExperience() {
                   onPlay={startRound}
                 />
 
-                <p className="border-t border-neutral-850 pt-4 text-xs leading-5 text-neutral-500">
+                <p className="border-t border-black/10 pt-4 text-xs leading-5 text-black/45">
                   {text.complianceNote}
                 </p>
-              </section>
+              </JCard>
             </div>
           </div>
         ) : null}
 
-        {screen === "game" && selectedTrack ? (
+        {!booting && screen === "game" && selectedTrack ? (
           <div className="mx-auto w-full max-w-3xl">
             {round ? (
               <FinishLineGame
@@ -265,47 +350,62 @@ export default function SearchExperience() {
                 maxRounds={MATCH_ROUNDS}
                 totalScore={totalScore}
                 streak={currentStreak}
+                ghost={ghost}
                 onReset={backToLobby}
                 onNextRound={nextRound}
                 onScored={handleScored}
               />
             ) : roundError ? (
-              <div className="rounded-2xl border border-brand/30 bg-brand/10 p-6 text-center">
+              <div className="rounded-lg border border-brand/30 bg-brand/5 p-6 text-center">
                 <p className="text-sm text-brand-300">{roundError}</p>
                 <button
                   type="button"
                   onClick={backToLobby}
-                  className="mt-4 rounded-lg border border-neutral-800 px-4 py-2 text-sm text-neutral-200 transition hover:text-white"
+                  className="mt-4 rounded-md border border-neutral-800 px-4 py-2 text-sm text-neutral-200 transition-colors hover:text-white"
                 >
                   {text.backLabel}
                 </button>
               </div>
             ) : (
-              <div className="flex min-h-[40vh] items-center justify-center text-sm text-neutral-500">
+              <div className="flex min-h-[40vh] items-center justify-center font-mono text-sm text-neutral-500">
                 {text.loadingRound}…
               </div>
             )}
           </div>
         ) : null}
 
-        {screen === "result" && selectedTrack && team ? (
+        {!booting && screen === "result" && selectedTrack && team ? (
           <div className="mx-auto w-full max-w-3xl">
-            <MatchResult
-              team={team}
-              track={selectedTrack}
-              score={totalScore}
-              roundsPlayed={completedRounds}
-              maxRounds={MATCH_ROUNDS}
-              bestStreak={bestStreak}
-              labels={text}
-              onRematch={() => startRound(selectedTrack)}
-              onNewSong={backToLobby}
-            />
+            {challenge ? (
+              <DuelResult
+                youName={team.playerName}
+                rivalName={challenge.name}
+                head={headToHead(roundResults, challenge.rounds)}
+                labels={text}
+                onRematch={() => startRound(selectedTrack)}
+                onBack={backToLobby}
+              />
+            ) : (
+              <MatchResult
+                team={team}
+                track={selectedTrack}
+                score={totalScore}
+                roundsPlayed={completedRounds}
+                maxRounds={MATCH_ROUNDS}
+                bestStreak={bestStreak}
+                shareUrl={shareUrl}
+                copied={copied}
+                onCopyLink={copyShareLink}
+                labels={text}
+                onRematch={() => startRound(selectedTrack)}
+                onNewSong={backToLobby}
+              />
+            )}
           </div>
         ) : null}
       </main>
 
-      {screen === "lobby" ? (
+      {!booting && screen === "lobby" ? (
         <BottomNav items={navItems} active={lobbyTab} onSelect={onNavSelect} />
       ) : null}
     </div>

@@ -1,10 +1,10 @@
 # Compliance & Security
 
-This document is the single source of truth for how **Lyric Royale** handles licensed lyric content, provider secrets, and contest content-usage rules. It is written to be **judge-verifiable**: every claim below can be checked against the public repo, the running demo, or a network trace.
+This document is the single source of truth for how **Soundclash** handles licensed lyric content, provider secrets, and contest content-usage rules. It is written to be **judge-verifiable**: every claim below can be checked against the public repo, the running demo, or a network trace.
 
 > Scope: Musixmatch Musicathon 2026 — non-commercial demo. Solo developer, deadline 21 June 2026.
 
-Related docs: [`PRODUCT_SPEC.md`](./PRODUCT_SPEC.md) · [`BUILD_PLAN.md`](./BUILD_PLAN.md) · [`ARCHITECTURE.md`](./ARCHITECTURE.md) · [`DATA_MODEL.md`](./DATA_MODEL.md) · [`PROMPTS.md`](./PROMPTS.md) · [`README.md`](../README.md)
+Related docs: [`PRODUCT_SPEC.md`](./PRODUCT_SPEC.md) · [`BRAND_SYSTEM.md`](./BRAND_SYSTEM.md) · [`PARTY_ROOM_PLAN.md`](./PARTY_ROOM_PLAN.md) · [`ARCHITECTURE.md`](./ARCHITECTURE.md) · [`DATA_MODEL.md`](./DATA_MODEL.md) · [`API_INTEGRATION.md`](./API_INTEGRATION.md) · [`README.md`](../README.md)
 
 ---
 
@@ -28,15 +28,20 @@ A judge can verify each item independently. Verification hints are in the right 
 
 Legend: ✅ implemented/verified · ⚠️ action required before/at submission.
 
+Current room implementation uses an in-memory server store for transient sessions.
+That is acceptable for the hackathon skeleton because it still stores only active
+round state and never writes Musixmatch lyric content to disk or database. When
+Supabase persistence lands, it must persist references only as described below.
+
 ---
 
 ## 2. Musixmatch Terms-of-Service Compliance
 
-Lyric content is **licensed**, not owned. Lyric Royale treats it as a real-time, attribution-bound resource and never as data we own or may redistribute.
+Lyric content is **licensed**, not owned. Soundclash treats it as a real-time, attribution-bound resource and never as data we own or may redistribute.
 
 ### 2.1 Hard rules we enforce
 
-| Rule | What it means | How Lyric Royale complies |
+| Rule | What it means | How Soundclash complies |
 |------|---------------|---------------------------|
 | **References only** | Never persist lyric text. | DB stores `track_id` + `line_index` + `round_type` + `seed`. Text is regenerated live. |
 | **No redistribution** | Don't share lyric excerpts to other users/systems. | Challenge links share a `share_slug` and round references only — never lyric strings. |
@@ -100,7 +105,13 @@ create table rounds (
 The runtime `Round` object **does** carry text, but it is generated live and shown transiently — it is never written back to the database:
 
 ```ts
-type RoundType = "finish_line" | "next_line" | "name_song" | "misheard" | "speed";
+type RoundType =
+  | "finish_line"
+  | "the_drop"
+  | "next_line"
+  | "artist_pick"
+  | "word_rush"
+  | "name_song";
 
 interface Round {
   id: string;
@@ -192,7 +203,7 @@ Secrets are server-side unless explicitly prefixed `NEXT_PUBLIC_`.
 | `ELEVENLABS_API_KEY` | server only | ElevenLabs TTS (`xi-api-key` header) |
 | `ANTHROPIC_API_KEY` | server only | Claude (`claude-opus-4-8`) |
 | `SUPABASE_DB_PASSWORD` | server only | Supabase Postgres DB password |
-| `SUPABASE_PROJECT_REF` | server only | Supabase project ref (`twqdwrkbztwssfhaznvw`) |
+| `SUPABASE_PROJECT_REF` | server only | Supabase project ref; keep the real value in `.env.local` / deployment secrets only. |
 | `NEXT_PUBLIC_SUPABASE_URL` | **public** | Supabase project URL (client) |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | **public** | Supabase publishable key (client, RLS-gated) |
 
@@ -202,7 +213,7 @@ MXM_KEY=...                              # server
 ELEVENLABS_API_KEY=...                   # server
 ANTHROPIC_API_KEY=...                    # server
 SUPABASE_DB_PASSWORD=...                 # server
-SUPABASE_PROJECT_REF=twqdwrkbztwssfhaznvw # server
+SUPABASE_PROJECT_REF=your_project_ref      # server
 NEXT_PUBLIC_SUPABASE_URL=...             # public (client-safe)
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=... # public (client-safe)
 ```
@@ -245,7 +256,11 @@ The repo is **public** at `github.com/MichaelxBelmonte/LyricRoyale`. Secrets mus
 ```
 
 - **Verified:** only `.env.example` is tracked by git; `.env.local` is gitignored and was **never committed** (absent from full history `--all`). The public repo does not contain real secrets.
-- Test audio artifacts (`*.mp3`, `*.wav`) and `*.pem` are also ignored.
+- Generated public soundtrack assets in `public/audio/*.mp3` are intentionally
+  committed so the public demo has music. Other ad-hoc audio artifacts
+  (`*.mp3`, `*.wav` outside `public/audio`) and `*.pem` are ignored.
+- **Verified:** `npm audit` reports 0 vulnerabilities after overriding
+  Next's transitive `postcss` resolution to the direct dependency.
 
 ---
 
@@ -297,7 +312,7 @@ git -C . ls-files | grep -E '\.env' # should show only: .env.example
 
 ## 7. Contest Content-Usage Restrictions (Summary)
 
-For the Musixmatch Musicathon 2026 submission, Lyric Royale operates strictly within these bounds:
+For the Musixmatch Musicathon 2026 submission, Soundclash operates strictly within these bounds:
 
 - **Non-commercial demo use only** — no monetization, no ads, no paid tiers.
 - **Lyric content is licensed via the Musixmatch API**, displayed in real time only, with mandatory `lyrics_copyright` attribution and the tracking pixel/script on every render.

@@ -1,16 +1,26 @@
-# Lyric Royale — Product Specification
+# Soundclash — Product Specification
 
-> A web **party game** built on real song **lyrics** with an **AI host**. Built for the Musixmatch Musicathon 2026. Solo developer, ~5 days, deadline **21 June 2026**.
+> A zero-install **music party game** built on real Musixmatch lyrics, phone controllers, a shared host screen, and an AI showrunner voice. Built for the Musixmatch Musicathon 2026.
 
-Positioning: *"Genius tells you what a lyric means; Lyric Royale uses the lyrics you know to make a game out of it."*
+Positioning: *"Press play. Pick a fight."*
 
-Sibling docs: see [`README.md`](../README.md) for stack/setup and key-safety rules, and [`PROMPTS.md`](./PROMPTS.md) for the full Claude prompt set (P1–P6).
+Sibling docs: see [`README.md`](../README.md) for stack/setup,
+[`BRAND_SYSTEM.md`](./BRAND_SYSTEM.md) for visual rules, and
+[`API_INTEGRATION.md`](./API_INTEGRATION.md) for provider details.
 
 ---
 
 ## 1. Vision & Positioning
 
-Lyric Royale turns the lyrics people already know into a fast, social party game. No microphone is needed for the core experience — you read a lyric and type or tap an answer. An AI emcee runs the show: it hypes you up, roasts you, and reveals scores with personality. You play, get a score, and challenge friends on the **same rounds** via a link.
+Soundclash turns lyrics people already know into a fast, shared-room party show.
+No microphone is needed for the core experience: the host screen shows the round,
+phones become controllers, and players mostly tap one answer. BEATBOT, the
+cassette AI host, speaks intros, transitions, reveals, leaders, and final-score
+moments.
+
+The interface should feel like a playable cassette object: cream J-cards, neon
+stickers, chrome buttons, LED scoreboards, clear plastic, tape dividers, and CRT
+scanline moments. See [`BRAND_SYSTEM.md`](./BRAND_SYSTEM.md).
 
 ### The white space (from competitive analysis)
 
@@ -18,11 +28,12 @@ Nobody combines all three of these in one product:
 
 | Pillar | What it means | Who else does it |
 |---|---|---|
-| **AI personality host/judge** | An emcee that speaks (TTS) with a selectable persona, generated live by Claude | Trivia apps have static prompts, not a reactive personality |
-| **Lyric-centric gameplay** | Games built on the *words* of songs — not pitch detection, not "name the artist" trivia | Karaoke apps score pitch; trivia apps don't use real synced lyrics |
-| **Async social** | Room-code play, async challenge links, leaderboards, shareable clips | Jackbox/Kahoot are synchronous-only or install-bound |
+| **AI personality host/judge** | A voice host that speaks via ElevenLabs and can later be driven by Claude | Trivia apps have static prompts, not a reactive personality |
+| **Lyric-centric gameplay** | Games built on the *words* of songs, including richsync timing | Karaoke apps score pitch; trivia apps don't use real synced lyrics |
+| **Shared-room social** | Jackbox-style host screen plus phones, with future leaderboard/challenge loops | Most lyric games are solo, install-bound, or pure karaoke |
 
-Critically: **Musixmatch — the sponsor and a judge — ships zero games.** Lyric Royale is the game-shaped showcase of their lyrics API that they don't build themselves.
+Critically: **Musixmatch — the sponsor and a judge — ships zero games.**
+Soundclash is a game-shaped showcase for their lyrics and richsync APIs.
 
 ### Why this wins judging
 
@@ -32,19 +43,21 @@ Judging is four criteria, **25% each**: Originality, Craft, Use of Musixmatch AP
 
 ## 2. Player Experience — One Session, Start to Finish
 
-This walkthrough is one casual async challenge, the primary MVP flow.
+This walkthrough is the primary shared-room demo flow.
 
-1. **Land.** Alex opens the public demo URL (no install, no login). The home screen offers *Start a game* or *Enter a room code*.
-2. **Pick a mode + host.** Alex picks **Finish the Line** and the **Hype-Man** host persona. (Personas are described in [§7](#7-the-ai-host).)
-3. **Round intro.** The host speaks: *"Alright Alex, five lines, no mercy — let's GO."* (Claude generates the line via prompt P6 `round_intro`; ElevenLabs speaks it. The Musixmatch `lyrics_copyright` is shown and the tracking pixel fires the moment a lyric is on screen.)
-4. **Play a round.** A lyric appears with its last word(s) blanked: *"Is this the real life? Is this just ______?"* A 15-second timer runs. Alex types `fantasy`.
-5. **Verdict.** Correct. The speed bonus is large because Alex answered in 3s. The host reacts: *"FANTASY! Didn't even blink — respect."* (P6 `correct`.)
-6. **Repeat.** Four more rounds, mixing in a wrong answer (host roast via P6 `wrong`) and a near-miss.
-7. **Score reveal.** After round 5, the host reveals the total with flourish: *"4 out of 5 and a stack of speed points — that's a 920."* (P6 `score_reveal`.)
-8. **Outro + challenge.** The host signs off (P6 `game_outro`). Alex gets a **share slug link** and an optional **AI-narrated highlight clip**. Alex sends the link to Sam.
-9. **The async loop closes.** Sam opens the link, plays the **exact same rounds** (same `track_id` + `line_index` + `seed`, regenerated live), and tries to beat 920. Both scores land on the **daily and global leaderboards**.
+1. **Land.** The host opens the demo URL and sees the minimal Soundclash home screen: wordmark, BEATBOT, primary actions, and the animated signature waveform.
+2. **Create room.** The host creates a session at `/host/new`, choosing a voice preset.
+3. **Join.** Players open `/join`, enter the room code, and can leave the stage name empty for an automatic name.
+4. **Start show.** The host taps **Auto-pick show** or chooses one seed track from Musixmatch search.
+5. **Autopilot.** BEATBOT speaks the first round, then Soundclash rotates a 6-round mini-game set automatically.
+6. **Play.** Phones show one simple action: tap an option or lock an answer before reveal. Static ElevenLabs/LALAL audio assets carry the room from setup into gameplay when browser playback is available.
+7. **Reveal.** The host screen reveals the answer, scoreboard, and voice line; the next round starts automatically.
+8. **Finale.** After round 6, final scores are locked and the winner is crowned.
 
-No lyric text is ever stored or redistributed — every prompt/option/answer is regenerated live at play time from a Musixmatch fetch + Claude, and shown transiently. See [§8](#8-compliance--data-model) and [`PROMPTS.md`](./PROMPTS.md).
+No lyric text is ever stored or redistributed. Every prompt/option/answer is
+regenerated live at play time from a Musixmatch fetch plus server-side round
+logic; Claude can later enrich banter and direction without changing that
+compliance posture.
 
 ---
 
@@ -52,14 +65,17 @@ No lyric text is ever stored or redistributed — every prompt/option/answer is 
 
 | # | Mode | Mic? | Tier | One-liner |
 |---|---|---|---|---|
-| 1 | Finish the Line | No | MVP | Type the hidden last word(s) of a line |
-| 2 | Next Line | No | MVP | Pick the correct following line (4 options) |
-| 3 | Name That Song | No | MVP | Pick the correct song for a snippet (4 options) |
-| 4 | Misheard Lyrics | No | MVP | Pick the REAL line among funny mondegreen decoys |
-| 5 | Speed Lyrics | No | Stretch | Timed rapid-fire word rounds |
-| 6 | Karaoke (sing-and-score) | **Yes** | Stretch / wow | Pitch + word/timing accuracy vs a reference |
+| 1 | Finish the Line | No | Current | Tap the hidden last word of a lyric line |
+| 2 | The Drop | No | Current | Tap the missing word as richsync timing lands |
+| 3 | Next Line | No | Current | Pick the line that comes next |
+| 4 | Artist Lock | No | Current | Pick the artist behind a shown lyric |
+| 5 | Word Rush | No | Current | Pick the recurring keyword in the song |
+| 6 | Name That Song | No | Current | Pick the correct song for a lyric snippet |
+| 7 | Stem Guess | No | Lab | Guess isolated stem vs backing track using LALAL.AI |
+| 8 | Karaoke (sing-and-score) | Yes | Stretch / wow | Pitch + word/timing accuracy vs a reference |
 
-All word-game scoring is **correctness + speed bonus** (the bonus decays with elapsed time). Karaoke scoring is **pitch accuracy + word/timing accuracy**.
+Current room scoring is **correctness + speed bonus**. Karaoke scoring would add
+pitch accuracy plus word/timing accuracy.
 
 ---
 
@@ -72,9 +88,9 @@ Each mode below specifies its **goal**, the **round flow** step by step, and **s
 - **Goal:** Recall the missing word(s) that end a lyric line.
 - **How a round works:**
   1. Server picks a `track_id` + `line_index` (seeded) and fetches full lyrics from Musixmatch (`track.lyrics.get`).
-  2. Claude (prompt **P1**, `finish_line`) selects the line, blanks the last word(s), and returns `{ prompt, answer }` as strict JSON.
+  2. Server-side round logic selects the line, blanks the last word, and builds 4 options.
   3. Client shows the line with a blank and starts the `time_limit_ms` timer (default 15000).
-  4. Player types the answer; submit (or timeout) ends the round.
+  4. Player taps the answer; submit (or timeout) ends the round.
   5. Answer is matched case-insensitively with light normalization (trim, punctuation-tolerant).
 - **Scoring:** `points = base (if correct) + speed_bonus`. `speed_bonus` decays with elapsed time toward zero at the time limit. Wrong/timeout = 0 for that round.
 
@@ -174,13 +190,25 @@ async function buildRound(ref: { trackId: string; lineIndex: number; type: Round
 }
 ```
 
-The Claude model is **`claude-opus-4-8`** (the current, verified model ID). All prompts (P1–P6) return **strict JSON**; lyric text is never logged or stored. See [`PROMPTS.md`](./PROMPTS.md).
+Claude prompts remain the planned enrichment layer for generated banter, mood,
+and more adaptive round direction. Any prompt that receives lyric text must treat
+it as transient: never logged, cached, or stored. See [`PROMPTS.md`](./PROMPTS.md).
 
 ---
 
 ## 7. The AI Host
 
-The host is an ElevenLabs TTS voice driven by short, punchy lines that Claude generates per event. Lines are 1–2 sentences, no slurs, broadly tasteful.
+The host is an ElevenLabs TTS voice driven by short, punchy lines. Current room
+events use templated lines; Claude can later generate mood-aware event copy.
+
+The app also includes a lightweight music bed. The home waveform uses a
+personalized ElevenLabs Music v2 signature with an original Soundclash vocal
+hook; LALAL.AI has split that same full mix into vocal and backing stems for the
+next Signal Check micro-game. The home currently plays only the full mix to keep
+the first screen simple. Round screens use a separate instrumental clash loop.
+All assets are static, attempt autoplay, fall back to first tap when browsers
+block sound, and duck while BEATBOT speaks. The home waveform keeps one simple
+play/stop interaction.
 
 ### Personalities
 
@@ -227,7 +255,13 @@ Optionally, the host auto-generates a shareable **highlight clip** with an AI-na
 Generated live, not persisted with text:
 
 ```ts
-type RoundType = "finish_line" | "next_line" | "name_song" | "misheard" | "speed";
+type RoundType =
+  | "finish_line"
+  | "the_drop"
+  | "next_line"
+  | "artist_pick"
+  | "word_rush"
+  | "name_song";
 
 interface Round {
   id: string;
@@ -245,7 +279,7 @@ interface Round {
 
 ### Supabase / Postgres schema (references only)
 
-RLS is enabled on every table. Anonymous casual play is allowed via `anon_name` (challenge guests, no auth); authed users go through `profiles`. Supabase `project_ref = twqdwrkbztwssfhaznvw`.
+RLS is enabled on every table. Anonymous casual play is allowed via `anon_name` (challenge guests, no auth); authed users go through `profiles`. The Supabase project ref stays in `.env.local` / deployment secrets, not in the public repo.
 
 ```sql
 create table profiles (
@@ -257,7 +291,7 @@ create table profiles (
 
 create table games (
   id uuid primary key default gen_random_uuid(),
-  mode text check (mode in ('finish_line','next_line','name_song','misheard','speed','karaoke')),
+  mode text check (mode in ('finish_line','the_drop','next_line','artist_pick','word_rush','name_song','karaoke')),
   created_by uuid references profiles,
   config jsonb,
   created_at timestamptz default now()

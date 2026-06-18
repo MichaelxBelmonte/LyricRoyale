@@ -1,7 +1,8 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Hanken_Grotesk, JetBrains_Mono, Anton, Permanent_Marker } from "next/font/google";
+import AudioDirector from "@/components/audio/AudioDirector";
 
 const sans = Hanken_Grotesk({
   subsets: ["latin"],
@@ -16,28 +17,75 @@ const mono = JetBrains_Mono({
   display: "swap",
 });
 
+// Condensed poster face for mixtape-style headlines.
+const condensed = Anton({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-condensed",
+  display: "swap",
+});
+
+// Handwritten marker for J-card scribbles + tape-label notes.
+const marker = Permanent_Marker({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-marker",
+  display: "swap",
+});
+
+const description =
+  "The music party game where friends clash on the same track. Powered by live Musixmatch lyrics.";
+
 export const metadata: Metadata = {
-  title: "Lyric Royale",
-  description: "A bilingual party game powered by live Musixmatch lyrics.",
-  applicationName: "Lyric Royale",
+  metadataBase: new URL("https://soundclash.app"),
+  title: "Soundclash",
+  description,
+  applicationName: "Soundclash",
   appleWebApp: {
     capable: true,
-    title: "Lyric Royale",
+    title: "Soundclash",
     statusBarStyle: "black-translucent",
+  },
+  openGraph: {
+    title: "Soundclash",
+    description,
+    siteName: "Soundclash",
+    type: "website",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Soundclash" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Soundclash",
+    description,
+    images: ["/og.png"],
+  },
+  icons: {
+    icon: [
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: "#0b0b0b",
   width: "device-width",
   initialScale: 1,
+  // Draw under the notch/home-indicator so env(safe-area-inset-*) becomes active.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
-      <body className="min-h-screen bg-neutral-950 font-sans text-neutral-100 antialiased">
+    <html
+      lang="en"
+      className={`${sans.variable} ${mono.variable} ${condensed.variable} ${marker.variable}`}
+    >
+      <body className="min-h-[100dvh] bg-[#0b0b0b] font-sans text-neutral-100 antialiased">
         {children}
+        <AudioDirector />
       </body>
     </html>
   );

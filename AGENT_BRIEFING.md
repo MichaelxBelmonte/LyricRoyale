@@ -1,34 +1,34 @@
-# Agent Briefing — Lyric Royale
+# Agent Briefing — Soundclash
 
 > Paste this into your coding agent (Replit Agent / Cursor / Claude Code) to onboard it onto the project. Claude Code users can also keep it as `CLAUDE.md` to auto-load it every session.
 
 ---
 
-You are a **senior full-stack engineer** building **Lyric Royale**, a web party game for the **Musixmatch Musicathon 2026** (solo founder, deadline **21 June 2026**). The repository is: `https://github.com/MichaelxBelmonte/LyricRoyale`
+You are a **senior full-stack engineer** building **Soundclash**, a zero-install music party game for the **Musixmatch Musicathon 2026**. The repository is: `https://github.com/MichaelxBelmonte/LyricRoyale`
 
 ## 0. Read before writing any code
 The `docs/` folder is the **single source of truth**. Read these first, then follow them exactly — do **not** invent schema, game modes, or prompts; reuse the canonical ones verbatim.
 1. `docs/README.md` — overview & index
 2. `docs/PRODUCT_SPEC.md` — what to build (modes, AI host, social loop, judging-criteria mapping)
-3. `docs/ARCHITECTURE.md` — system design, folder structure, server-proxy pattern, per-round data flow
-4. `docs/DATA_MODEL.md` — Supabase schema (DDL + RLS) and the canonical runtime `Round` type
-5. `docs/API_INTEGRATION.md` — provider endpoints, tested status, server-side examples
-6. `docs/PROMPTS.md` — the exact Claude prompts (P1–P6): round generation, misheard decoys, name-that-song distractors, mood/theme, host system + banter
-7. `docs/BUILD_PLAN.md` — the day-by-day plan (you execute **Day 1** first)
+3. `docs/BRAND_SYSTEM.md` — Soundclash cassette/Y2K mood-board rules and UI direction
+4. `docs/PARTY_ROOM_PLAN.md` — current shared-room/autopilot implementation plan
+5. `docs/ARCHITECTURE.md` — system design, folder structure, server-proxy pattern, per-round data flow
+6. `docs/DATA_MODEL.md` — Supabase schema (DDL + RLS) and the canonical runtime `Round` type
+7. `docs/API_INTEGRATION.md` — provider endpoints, tested status, server-side examples
 8. `docs/COMPLIANCE.md` — Musixmatch ToS + security rules (non-negotiable)
 
 If the docs are ambiguous, follow them and flag the ambiguity. If two docs conflict, **stop and ask** — never guess silently.
 
 ## 1. The product
-A browser party game built on **real song lyrics** with an **AI host**. Everyone can play (no microphone needed for the core), an AI emcee runs the show and hypes/roasts players, and you challenge friends via a link. Modes: **finish_line, next_line, name_song, misheard, speed** (no-mic MVP) + **karaoke** (sing-and-score, stretch). Differentiator: AI-host personality + lyric-centric gameplay + async challenge links — a combination no competitor (and not even Musixmatch) ships.
+A browser party game built on **real song lyrics** with an **AI host**. One device hosts the room, players join on phones, and BEATBOT runs a mostly automatic 6-round lyric show. Current modes: **finish_line, the_drop, next_line, artist_pick, word_rush, name_song**. Differentiator: cassette/Y2K brand, AI-host personality, lyric-centric gameplay, and a Jackbox-style zero-install room loop.
 
 ## 2. Stack & infra
-Next.js (App Router, TypeScript) + Tailwind · Supabase (Postgres + Auth + RLS) for scores/challenges/leaderboards · deploy on **Replit** (public demo URL). LLM = **Anthropic Claude (`claude-opus-4-8`)**. TTS = **ElevenLabs**. Lyrics = **Musixmatch**. Optional stem separation = **LALAL.AI**.
+Next.js (App Router, TypeScript) + Tailwind · in-memory room store now, Supabase Realtime/Postgres later · deploy on **Replit** or another public URL. TTS = **ElevenLabs**. Lyrics = **Musixmatch**. Stem separation = **LALAL.AI**. Claude is planned for richer host banter and mood-aware direction.
 
 ## 3. Environment (already in `.env.local`, gitignored — never print, log, or commit)
 - **Server-side secrets:** `MXM_KEY`, `ELEVENLABS_API_KEY`, `ANTHROPIC_API_KEY`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_REF`
 - **Public (browser-safe):** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- Supabase `project_ref`: `twqdwrkbztwssfhaznvw`
+- Supabase `project_ref`: keep it in `.env.local` / deployment secrets only.
 
 ## 4. Verified API status (already tested — do not re-discover)
 Musixmatch (live key): `track.search` ✅ · `track.lyrics.get` ✅ (FULL text) · `track.subtitle.get` ✅ (line sync) · `track.richsync.get` ✅ (WORD sync, shape `{ ts, te, x, l:[{ c, o }] }`) · `matcher.track.get` ✅ · `track.lyrics.mood.get` ❌ **403** → derive mood/theme with Claude (PROMPTS.md **P4**). ElevenLabs ✅ TTS (tier creator, ~131k credits, header `xi-api-key`).
@@ -36,7 +36,7 @@ Musixmatch (live key): `track.search` ✅ · `track.lyrics.get` ✅ (FULL text) 
 ## 5. Non-negotiable rules
 - **Security:** every Musixmatch / ElevenLabs / Claude / LALAL.AI call runs **only in Next.js server** (route handlers / server actions) as a proxy. Server-side keys must **never** reach the browser. Only `NEXT_PUBLIC_*` may be used client-side. Never commit `.env.local`.
 - **Compliance (Musixmatch ToS):** persist **only references** (`track_id` + `line_index` + `round_type` + `seed`). **Never store lyric text** in the database. Regenerate prompt/options/answer text **live** at play time. Display `lyrics_copyright` and fire the tracking pixel/script whenever lyrics render. No redistribution of lyric text in shared challenges. Non-commercial demo use only.
-- **Fidelity:** use the canonical `Round` type, the 6-mode set, and the exact tables from `docs/DATA_MODEL.md`.
+- **Brand fidelity:** primary screens must follow `docs/BRAND_SYSTEM.md`: cassette/J-card/Y2K, cream tape labels, ink black, magenta, teal, tangerine, LED/CRT scoreboards, sticker badges, and no generic dashboard feel.
 
 ## 6. Your task right now — Day 1 (see `docs/BUILD_PLAN.md`)
 Deliver, in order:

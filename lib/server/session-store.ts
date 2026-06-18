@@ -1,0 +1,437 @@
+import "server-only";
+
+import {
+  buildArtistPickRound,
+  buildFinishLineRound,
+  buildNameSongRound,
+  buildNextLineRound,
+  buildWordRushRound,
+  computeDrop,
+  normalizeAnswer,
+} from "@/lib/game/finish-line";
+import { ROUND_TIME_LIMIT_MS, scoreFinishLine } from "@/lib/game/scoring";
+import { getRichsyncLines, getTrackLyrics } from "@/lib/server/musixmatch";
+import type { Locale, TrackSummary } from "@/lib/types";
+import type {
+  CreateSessionInput,
+  HostVoiceConfig,
+  JoinSessionInput,
+  MiniGameId,
+  PartySession,
+  PublicSessionState,
+  SessionAnswer,
+  SessionPlayer,
+  SessionRound,
+  SessionTrackRef,
+  StartRoundInput,
+  SubmitAnswerInput,
+} from "@/lib/session/types";
+
+const DEFAULT_VOICE: HostVoiceConfig = {
+  preset: "hype",
+  label: "Hype Host",
+};
+
+const DEFAULT_MINI_GAMES: MiniGameId[] = [
+  "finish_line",
+  "the_drop",
+  "next_line",
+  "artist_pick",
+  "word_rush",
+  "name_song",
+];
+
+type Store = Map<string, PartySession>;
+
+const globalForSessions = globalThis as typeof globalThis & {
+  __lyricRoyaleSessions?: Store;
+};
+
+const sessions: Store = globalForSessions.__lyricRoyaleSessions ?? new Map();
+globalForSessions.__lyricRoyaleSessions = sessions;
+
+function now(): number {
+  return Date.now();
+}
+
+function cleanCode(value: string): string {
+  return value.trim().toUpperCase();
+}
+
+function code(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let value = "";
+  for (let i = 0; i < 4; i++) {
+    value += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return sessions.has(value) ? code() : value;
+}
+
+function playerId(): string {
+  return `p_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`;
+}
+
+function assertSession(sessionCode: string): PartySession {
+  const session = sessions.get(cleanCode(sessionCode));
+  if (!session) throw new Error("session_not_found");
+  return session;
+}
+
+function publicState(session: PartySession): PublicSessionState {
+  const currentRound = session.currentRound
+    ? {
+        ...session.currentRound,
+        solution: session.currentRound.status === "revealed" ? session.currentRound.solution : undefined,
+        answers: [...session.currentRound.answers].sort((a, b) => b.points - a.points),
+      }
+    : null;
+
+  return {
+    ...session,
+    playerCount: session.players.length,
+    players: [...session.players].sort((a, b) => b.score - a.score || a.joinedAt - b.joinedAt),
+    currentRound,
+  };
+}
+
+export function createSession(input: CreateSessionInput = {}): PublicSessionState {
+  const createdAt = now();
+  const session: PartySession = {
+    code: code(),
+    status: "lobby",
+    locale: input.locale === "it" ? "it" : ("en" satisfies Locale),
+    hostName: input.hostName?.trim() || "Host",
+    voice: {
+      ...DEFAULT_VOICE,
+      ...input.voice,
+      label: input.voice?.label?.trim() || DEFAULT_VOICE.label,
+    },
+    miniGames: DEFAULT_MINI_GAMES,
+    autopilot: input.autopilot ?? true,
+    trackPool: [],
+    players: [],
+    currentRound: null,
+    createdAt,
+    updatedAt: createdAt,
+  };
+  sessions.set(session.code, session);
+  return publicState(session);
+}
+
+export function getSession(sessionCode: string): PublicSessionState {
+  return publicState(assertSession(sessionCode));
+}
+
+export function joinSession(sessionCode: string, input: JoinSessionInput = {}) {
+  const session = assertSession(sessionCode);
+  const joinedAt = now();
+  const baseName = input.name?.trim() || `Player ${session.players.length + 1}`;
+  const player: SessionPlayer = {
+    id: playerId(),
+    name: baseName.slice(0, 24),
+    score: 0,
+    joinedAt,
+    lastSeenAt: joinedAt,
+  };
+  session.players.push(player);
+  session.updatedAt = joinedAt;
+  return { player, session: publicState(session) };
+}
+
+export function touchPlayer(sessionCode: string, id: string): PublicSessionState {
+  const session = assertSession(sessionCode);
+  const player = session.players.find((item) => item.id === id);
+  if (player) player.lastSeenAt = now();
+  return publicState(session);
+}
+
+function toTrackSummary(track: SessionTrackRef): TrackSummary {
+  return {
+    trackId: track.trackId,
+    trackName: track.trackName,
+    artistName: track.artistName,
+    hasLyrics: true,
+    hasRichsync: track.hasRichsync === true,
+  };
+}
+
+function cleanDeck(deck: SessionTrackRef[] | undefined): SessionTrackRef[] {
+  const seen = new Set<number>();
+  return (deck ?? [])
+    .filter((track) => Number.isInteger(track.trackId) && track.trackId > 0)
+    .filter((track) => {
+      if (seen.has(track.trackId)) return false;
+      seen.add(track.trackId);
+      return true;
+    })
+    .slice(0, 8);
+}
+
+function nextMiniGame(session: PartySession, requested: MiniGameId | undefined, hasRichsync: boolean): MiniGameId {
+  if (requested) return requested === "the_drop" && !hasRichsync ? "finish_line" : requested;
+  const nextIndex = session.currentRound?.index ?? 0;
+  const cycle = session.miniGames.length ? session.miniGames : DEFAULT_MINI_GAMES;
+  const selected = cycle[nextIndex % cycle.length];
+  return selected === "the_drop" && !hasRichsync ? "finish_line" : selected;
+}
+
+function labelsFor(miniGame: MiniGameId) {
+  if (miniGame === "name_song") {
+    return {
+      title: "Name That Song",
+      instruction: "Pick the track that contains this lyric.",
+    };
+  }
+  if (miniGame === "next_line") {
+    return {
+      title: "Next Line",
+      instruction: "Pick the line that comes next.",
+    };
+  }
+  if (miniGame === "artist_pick") {
+    return {
+      title: "Artist Lock",
+      instruction: "Pick the artist behind this lyric.",
+    };
+  }
+  if (miniGame === "word_rush") {
+    return {
+      title: "Word Rush",
+      instruction: "Pick the recurring keyword.",
+    };
+  }
+  if (miniGame === "the_drop") {
+    return {
+      title: "The Drop",
+      instruction: "Tap the missing word as the lyric lands.",
+    };
+  }
+  return {
+    title: "Finish the Line",
+    instruction: "Tap the missing word.",
+  };
+}
+
+async function buildSessionRound(input: {
+  session: PartySession;
+  track: SessionTrackRef;
+  miniGame: MiniGameId;
+  seed: number;
+  startedAt: number;
+}): Promise<SessionRound> {
+  const lyrics = await getTrackLyrics(input.track.trackId);
+  const labels = labelsFor(input.miniGame);
+  const base = {
+    index: (input.session.currentRound?.index ?? 0) + 1,
+    miniGame: input.miniGame,
+    title: labels.title,
+    instruction: labels.instruction,
+    trackId: input.track.trackId,
+    trackName: input.track.trackName,
+    artistName: input.track.artistName,
+    hasRichsync: input.track.hasRichsync,
+    seed: input.seed,
+    copyright: lyrics.copyright,
+    tracking: lyrics.tracking,
+    startedAt: input.startedAt,
+    endsAt: input.startedAt + ROUND_TIME_LIMIT_MS,
+    status: "answering" as const,
+    answers: [],
+  };
+
+  if (input.miniGame === "next_line") {
+    const nextLine = buildNextLineRound({
+      trackId: input.track.trackId,
+      seed: input.seed,
+      lyrics: lyrics.body,
+      copyright: lyrics.copyright,
+      tracking: lyrics.tracking,
+    });
+    return {
+      ...base,
+      prompt: nextLine.prompt,
+      answerType: "choice",
+      options: nextLine.options,
+      solution: nextLine.answer,
+    };
+  }
+
+  if (input.miniGame === "name_song") {
+    const deck = input.session.trackPool.length ? input.session.trackPool : [input.track];
+    const nameSong = buildNameSongRound({
+      track: toTrackSummary(input.track),
+      seed: input.seed,
+      lyrics: lyrics.body,
+      copyright: lyrics.copyright,
+      tracking: lyrics.tracking,
+      deck: deck.map(toTrackSummary),
+    });
+    return {
+      ...base,
+      prompt: nameSong.prompt,
+      answerType: "choice",
+      options: nameSong.options,
+      solution: nameSong.answer,
+    };
+  }
+
+  if (input.miniGame === "artist_pick") {
+    const deck = input.session.trackPool.length ? input.session.trackPool : [input.track];
+    const artistPick = buildArtistPickRound({
+      track: toTrackSummary(input.track),
+      seed: input.seed,
+      lyrics: lyrics.body,
+      copyright: lyrics.copyright,
+      tracking: lyrics.tracking,
+      deck: deck.map(toTrackSummary),
+    });
+    return {
+      ...base,
+      prompt: artistPick.prompt,
+      answerType: "choice",
+      options: artistPick.options,
+      solution: artistPick.answer,
+    };
+  }
+
+  if (input.miniGame === "word_rush") {
+    const wordRush = buildWordRushRound({
+      track: toTrackSummary(input.track),
+      seed: input.seed,
+      lyrics: lyrics.body,
+      copyright: lyrics.copyright,
+      tracking: lyrics.tracking,
+    });
+    return {
+      ...base,
+      prompt: wordRush.prompt,
+      answerType: "choice",
+      options: wordRush.options,
+      solution: wordRush.answer,
+    };
+  }
+
+  const generated = buildFinishLineRound({
+    trackId: input.track.trackId,
+    seed: input.seed,
+    lyrics: lyrics.body,
+    copyright: lyrics.copyright,
+    tracking: lyrics.tracking,
+  });
+
+  let prompt = generated.round.prompt;
+  let drop: SessionRound["drop"];
+  if (input.miniGame === "the_drop") {
+    try {
+      const richsyncLines = await getRichsyncLines(input.track.trackId);
+      drop = computeDrop(generated.line, generated.answer, richsyncLines) ?? undefined;
+      prompt = drop ? generated.round.prompt : generated.round.prompt;
+    } catch {
+      // No richsync: keep the same lyric prompt and play as a timing-lite round.
+    }
+  }
+
+  return {
+    ...base,
+    prompt,
+    answerType: "choice",
+    options: generated.options,
+    drop,
+    solution: generated.answer,
+  };
+}
+
+export async function startRound(sessionCode: string, input: StartRoundInput): Promise<PublicSessionState> {
+  const session = assertSession(sessionCode);
+  const trackId = Number(input.trackId);
+  const fallbackTrack = session.currentRound
+    ? {
+        trackId: session.currentRound.trackId,
+        trackName: session.currentRound.trackName,
+        artistName: session.currentRound.artistName,
+        hasRichsync: session.currentRound.hasRichsync,
+      }
+    : null;
+  const track: SessionTrackRef | null = Number.isInteger(trackId) && trackId > 0
+    ? {
+        trackId,
+        trackName: input.trackName?.trim() || "Selected track",
+        artistName: input.artistName?.trim() || "Musixmatch",
+        hasRichsync: input.hasRichsync,
+      }
+    : fallbackTrack;
+
+  if (!track) throw new Error("invalid_track_id");
+
+  const nextDeck = cleanDeck(input.deck);
+  if (nextDeck.length > 0) session.trackPool = nextDeck;
+  if (!session.trackPool.some((item) => item.trackId === track.trackId)) {
+    session.trackPool = [track, ...session.trackPool].slice(0, 8);
+  }
+
+  const startedAt = now();
+  const miniGame = nextMiniGame(session, input.auto ? undefined : input.miniGame, track.hasRichsync === true);
+  const seed = Math.max(0, session.currentRound?.index ?? 0);
+  let round: SessionRound;
+  try {
+    round = await buildSessionRound({ session, track, miniGame, seed, startedAt });
+  } catch (err) {
+    if (miniGame === "finish_line") throw err;
+    round = await buildSessionRound({ session, track, miniGame: "finish_line", seed: seed + 101, startedAt });
+  }
+
+  session.status = "playing";
+  session.currentRound = round;
+  session.updatedAt = startedAt;
+  return publicState(session);
+}
+
+export async function submitAnswer(sessionCode: string, input: SubmitAnswerInput) {
+  const session = assertSession(sessionCode);
+  const round = session.currentRound;
+  const player = session.players.find((item) => item.id === input.playerId);
+  const guess = input.guess?.trim() ?? "";
+  if (!round || session.status !== "playing") throw new Error("round_not_active");
+  if (!player) throw new Error("player_not_found");
+  if (!guess) throw new Error("empty_guess");
+  if (round.answers.some((answer) => answer.playerId === player.id)) {
+    return { answer: round.answers.find((answer) => answer.playerId === player.id), session: publicState(session) };
+  }
+
+  const submittedAt = now();
+  const elapsedMs = Math.min(Math.max(0, submittedAt - round.startedAt), ROUND_TIME_LIMIT_MS);
+  const solution = round.solution ?? "";
+  const correct = normalizeAnswer(guess) === normalizeAnswer(solution);
+  const points = scoreFinishLine(correct, elapsedMs);
+  const answer: SessionAnswer = {
+    playerId: player.id,
+    playerName: player.name,
+    guess,
+    correct,
+    points,
+    elapsedMs,
+    submittedAt,
+  };
+
+  round.answers.push(answer);
+  player.score += points;
+  player.lastSeenAt = submittedAt;
+  session.updatedAt = submittedAt;
+  return { answer, session: publicState(session) };
+}
+
+export function revealRound(sessionCode: string): PublicSessionState {
+  const session = assertSession(sessionCode);
+  if (session.currentRound) session.currentRound.status = "revealed";
+  session.status = "results";
+  session.updatedAt = now();
+  return publicState(session);
+}
+
+export function backToLobby(sessionCode: string): PublicSessionState {
+  const session = assertSession(sessionCode);
+  session.status = "lobby";
+  session.currentRound = null;
+  session.updatedAt = now();
+  return publicState(session);
+}

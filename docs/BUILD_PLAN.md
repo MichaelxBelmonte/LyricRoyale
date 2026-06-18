@@ -1,8 +1,10 @@
 # 5-Day Build Plan
 
-Lyric Royale — a web party game built on real song lyrics with an AI host, for the Musixmatch Musicathon 2026. Solo developer, ~5 days, deadline **21 June 2026**.
+Soundclash — a cassette/Y2K music party game built on real Musixmatch lyrics, phone controllers, and an AI host, for the Musixmatch Musicathon 2026.
 
-This plan sequences the build so that judging-critical capabilities (meaningful Musixmatch usage, AI personality host, async challenge links, leaderboards) land first, and the high-risk/optional karaoke stretch lands last where it can be cut without hurting the core demo.
+This plan sequences the build so judging-critical capabilities land first:
+meaningful Musixmatch usage, a polished shared-room loop, AI host presence,
+strong Soundclash visual craft, and optional karaoke/stem features last.
 
 **De-risking note:** the two pieces most likely to sink a music project are already verified live. Musixmatch `track.richsync.get` returns **200 OK** with WORD-level synced lyrics, and ElevenLabs TTS (`POST /v1/text-to-speech/{voice_id}`) returns **200 audio/mpeg**. The day-by-day plan below leans on both from Day 1, so we are integrating known-good APIs rather than discovering them under deadline.
 
@@ -48,7 +50,7 @@ Sibling docs:
    ```
    Confirm `.env.local` is gitignored; copy `.env.example` → `.env.local` and fill values.
 
-2. **Supabase client wiring.** Browser client uses `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; project ref is `twqdwrkbztwssfhaznvw`. Apply the schema (full DDL in `DATA_MODEL.md`):
+2. **Supabase client wiring.** Browser client uses `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; the project ref stays in local/deployment secrets. Apply the schema (full DDL in `DATA_MODEL.md`):
    ```sql
    create table profiles (
      id uuid primary key references auth.users,
@@ -90,7 +92,13 @@ The app renders one richsync line word-by-word in the browser, sourced entirely 
 ### Runtime Round shape (generated live, NOT persisted with text)
 
 ```ts
-type RoundType = "finish_line" | "next_line" | "name_song" | "misheard" | "speed";
+type RoundType =
+  | "finish_line"
+  | "the_drop"
+  | "next_line"
+  | "artist_pick"
+  | "word_rush"
+  | "name_song";
 
 interface Round {
   id: string;
@@ -169,7 +177,9 @@ Finishing a game yields a working `share_slug` link a friend can play on the sam
    - The Day 1 `<LiveLyric>` richsync timing is the basis for word/timing accuracy.
 
 ### Day 4 done when
-All four word modes (`finish_line`, `next_line`, `name_song`, `misheard`) work end-to-end, with `speed` as a bonus. Karaoke is either functional or explicitly deferred per the risk register below.
+The current six tap-first room modes (`finish_line`, `the_drop`, `next_line`,
+`artist_pick`, `word_rush`, `name_song`) work end-to-end. Karaoke/stem games are
+either functional in the lab or explicitly deferred per the risk register below.
 
 ---
 
@@ -212,12 +222,12 @@ Each risk has an explicit cut-line so we never blow the deadline chasing a nice-
 
 ## Submission checklist
 
-- [ ] **Title** — Lyric Royale.
-- [ ] **One-liner** — "Genius tells you what a lyric means; Lyric Royale uses the lyrics you know to make a game out of it."
-- [ ] **Description** — web party game on real lyrics, AI personality host (Hype-Man / Deadpan British Judge / Diva), no-mic core modes, async challenge links, global + daily leaderboards.
+- [ ] **Title** — Soundclash.
+- [ ] **One-liner** — "Press play. Pick a fight."
+- [ ] **Description** — zero-install music party game on real Musixmatch lyrics: one host screen, phones as controllers, BEATBOT voice host, mostly automatic lyric mini-games, and a cassette/Y2K visual system.
 - [ ] **Cover image** — produced and attached.
 - [ ] **Demo** — public Replit demo URL **and/or** the 90-second demo video.
 - [ ] **Public repo** — `github.com/MichaelxBelmonte/LyricRoyale`, no secrets committed (`.env.local` gitignored).
 - [ ] **Meaningful Musixmatch usage** — `track.search`, `track.lyrics.get` (full lyrics), `track.subtitle.get`, `track.richsync.get` (WORD-level synced gameplay + karaoke timing), `matcher.track.get`; `lyrics_copyright` displayed and tracking pixel fired on every lyric display.
 - [ ] **Compliance verified** — references-only persistence (no lyric text stored), live refetch, no redistribution in shared challenges, non-commercial demo use only.
-- [ ] **Security** — ElevenLabs key and Supabase DB password rotated; secrets only in `.env.local` / Replit Secrets.
+- [ ] **Security** — `npm audit` clean; ElevenLabs key and Supabase DB password rotated; secrets only in `.env.local` / deployment secrets.

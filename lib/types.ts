@@ -65,6 +65,10 @@ export interface SearchResponse {
   results: TrackSummary[];
 }
 
+export interface TrackResponse {
+  track: TrackSummary;
+}
+
 export interface FinishLineResponse {
   round: FinishLineRound;
 }

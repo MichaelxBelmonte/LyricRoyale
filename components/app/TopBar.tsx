@@ -1,6 +1,7 @@
 "use client";
 
 import LanguageToggle from "@/components/LanguageToggle";
+import Logo from "@/components/brand/Logo";
 import Avatar from "@/components/ui/Avatar";
 import Icon from "@/components/ui/Icon";
 import type { Locale, SingerTeam } from "@/lib/types";
@@ -23,7 +24,7 @@ export default function TopBar({
   backLabel,
 }: TopBarProps) {
   return (
-    <header className="sticky top-0 z-20 border-b border-neutral-850 bg-neutral-950/85 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-neutral-850 bg-neutral-950/85 pt-[env(safe-area-inset-top)] backdrop-blur">
       <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-3 px-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-2.5">
           {onBack ? (
@@ -31,14 +32,12 @@ export default function TopBar({
               type="button"
               onClick={onBack}
               aria-label={backLabel}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 transition-colors hover:border-neutral-700 hover:text-white"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 transition-colors hover:border-neutral-700 hover:text-white sm:h-9 sm:w-9"
             >
               <Icon name="chevronLeft" size={18} />
             </button>
           ) : null}
-          <span className="truncate font-display text-base font-bold uppercase tracking-[0.18em] text-white">
-            Lyric<span className="text-brand">Royale</span>
-          </span>
+          <Logo href="/" className="h-5 sm:h-6" withMark markClassName="h-7 w-7" />
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">

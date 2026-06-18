@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import Button from "@/components/brand/Button";
+import JCard from "@/components/brand/JCard";
+import Led from "@/components/brand/Led";
+import Sticker from "@/components/brand/Sticker";
 import LiveLyricPreview from "@/components/richsync/LiveLyricPreview";
+import type { ChallengeRoundResult } from "@/lib/game/challenge";
 import {
   MAX_HEAT,
   ROUND_TIME_LIMIT_MS,
@@ -43,6 +48,10 @@ interface FinishLineGameProps {
     timedOutLabel: string;
     nextRound: string;
     viewResult: string;
+    rivalLabel: string;
+    beatThisLine: string;
+    lostThisLine: string;
+    tiedThisLine: string;
     richsyncTitle: string;
     richsyncLoading: string;
     richsyncUnavailable: string;
@@ -51,9 +60,10 @@ interface FinishLineGameProps {
   maxRounds: number;
   totalScore: number;
   streak: number;
+  ghost?: ChallengeRoundResult | null;
   onReset: () => void;
   onNextRound: () => void;
-  onScored: (points: number) => void;
+  onScored: (outcome: { points: number; correct: boolean; elapsedMs: number }) => void;
 }
 
 interface RoundResult {
@@ -72,6 +82,7 @@ export default function FinishLineGame({
   maxRounds,
   totalScore,
   streak,
+  ghost,
   onReset,
   onNextRound,
   onScored,
@@ -135,7 +146,7 @@ export default function FinishLineGame({
       setRemainingMs(Math.max(0, ROUND_TIME_LIMIT_MS - clampedElapsed));
       setResult({ correct, elapsedMs: clampedElapsed, timedOut, breakdown, answer: answerText });
       setPending(false);
-      onScored(breakdown.total);
+      onScored({ points: breakdown.total, correct, elapsedMs: clampedElapsed });
     },
     [isEncore, onScored, round.drop, round.seed, round.trackId, streak],
   );
@@ -175,19 +186,21 @@ export default function FinishLineGame({
   const primaryAction = isEncore ? labels.viewResult : labels.nextRound;
 
   return (
-    <section className="animate-pop-in rounded-lg border border-neutral-850 bg-neutral-925 p-4 shadow-card sm:p-6">
+    <section className="tx-grain tx-grain-dark relative animate-pop-in overflow-hidden rounded-2xl border border-white/10 bg-[#0e0e10] p-4 shadow-[0_20px_60px_-24px_rgba(255,0,127,0.35)] sm:p-6">
       {round.tracking.pixel ? (
         <img alt="" className="hidden" referrerPolicy="no-referrer" src={round.tracking.pixel} />
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-brand">{labels.roundTitle}</p>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#ff007f]/40 bg-[#ff007f]/10 px-3 py-1 font-mono text-[0.65rem] uppercase tracking-[0.2em] text-[#ff8cc0]">
+              ◉ {labels.roundTitle}
+            </span>
             {isEncore ? (
-              <span className="rounded border border-brand/50 px-2 py-0.5 font-mono text-[0.65rem] uppercase tracking-[0.15em] text-brand-300">
+              <Sticker tone="yellow" rotate={-3}>
                 {labels.encoreLabel} ×2
-              </span>
+              </Sticker>
             ) : null}
           </div>
           <h2 className="mt-2 truncate text-xl font-bold text-white sm:text-2xl">{track.trackName}</h2>
@@ -205,63 +218,102 @@ export default function FinishLineGame({
 
       <HeatMeter streak={streak} result={result} labels={labels} />
 
+      {ghost ? (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-neutral-850 bg-neutral-950 px-3 py-2">
+          <span className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-neutral-500">
+            {labels.rivalLabel}
+          </span>
+          <div className="flex items-center gap-3 font-mono text-sm tabular-nums text-neutral-300">
+            <span>{(ghost.elapsedMs / 1000).toFixed(1)}s</span>
+            <span>
+              {ghost.points} {labels.pointsLabel}
+            </span>
+            {result ? (
+              <span
+                className={
+                  result.breakdown.total > ghost.points
+                    ? "text-emerald-300"
+                    : result.breakdown.total < ghost.points
+                      ? "text-brand-300"
+                      : "text-neutral-400"
+                }
+              >
+                {result.breakdown.total > ghost.points
+                  ? labels.beatThisLine
+                  : result.breakdown.total < ghost.points
+                    ? labels.lostThisLine
+                    : labels.tiedThisLine}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <div className="mt-5">
-        <div className="flex items-center justify-between gap-3 text-xs font-medium uppercase tracking-[0.15em]">
-          <span className={timeDanger && !result ? "text-brand-300" : "text-neutral-500"}>
+        <div className="flex items-center justify-between gap-3">
+          <span
+            className={`font-mono text-xs font-medium uppercase tracking-[0.15em] ${
+              timeDanger && !result ? "text-[#ff8cc0]" : "text-neutral-500"
+            }`}
+          >
             {labels.timeRemainingLabel}
           </span>
-          <span className="font-mono text-base tabular-nums text-white">
-            {(remainingMs / 1000).toFixed(1)}s
-          </span>
+          <Led value={`${(remainingMs / 1000).toFixed(1)}s`} danger={timeDanger && !result} />
         </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-850">
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-850">
           <div
             className={[
-              "h-full transition-[width,background-color] duration-100",
-              timeDanger && !result ? "bg-brand" : "bg-neutral-500",
+              "h-full rounded-full transition-[width] duration-100",
+              timeDanger && !result
+                ? "animate-blank-pulse bg-[#ff007f]"
+                : "bg-gradient-to-r from-[#00e5d2] to-[#2ceadb]",
             ].join(" ")}
             style={{ width: `${remainingRatio * 100}%` }}
           />
         </div>
       </div>
 
-      <p className="mt-7 text-2xl font-semibold leading-relaxed text-white sm:text-3xl sm:leading-relaxed">
-        {round.drop && round.drop.tokens.length > 0 && !result ? (
-          <KaraokeTokens drop={round.drop} />
-        ) : (
-          promptBefore
-        )}
-        <span
-          className={[
-            "mx-1 inline-flex min-w-[3rem] items-center justify-center rounded border-b-2 px-2 align-baseline font-mono tracking-tight",
-            result ? "animate-slam-in" : "animate-blank-pulse",
-            result
-              ? result.correct
-                ? "border-emerald-400 text-emerald-300"
-                : "border-brand text-brand-300"
-              : "border-brand text-brand-300",
-          ].join(" ")}
-        >
-          {result ? result.answer : "_____"}
-        </span>
-        {promptAfter}
-      </p>
+      <JCard className="mt-6" contentClassName="p-5 sm:p-6">
+        <p className="font-mono text-[0.6rem] uppercase tracking-[0.28em] text-black/45">
+          {labels.roundTitle}
+        </p>
+        <p className="mt-3 text-2xl font-semibold leading-relaxed text-[#14110f] sm:text-3xl sm:leading-relaxed">
+          {round.drop && round.drop.tokens.length > 0 && !result ? (
+            <KaraokeTokens drop={round.drop} />
+          ) : (
+            promptBefore
+          )}
+          <span
+            className={[
+              "mx-1 inline-flex min-w-[3.5rem] items-center justify-center rounded-md border-2 px-2 align-middle font-mono tracking-tight",
+              result ? "animate-slam-in" : "animate-blank-pulse",
+              result
+                ? result.correct
+                  ? "border-[#00b8a8] bg-white text-[#00b8a8]"
+                  : "border-[#ff007f] bg-white text-[#d80069]"
+                : "border-dashed border-[#ff007f] bg-white/70 text-[#d80069]",
+            ].join(" ")}
+          >
+            {result ? result.answer : "_____"}
+          </span>
+          {promptAfter}
+        </p>
+      </JCard>
 
-      <form onSubmit={submit} className="mt-5 grid gap-2 sm:grid-cols-[1fr_auto]">
+      <HostBubble result={result} />
+
+      <form onSubmit={submit} className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
         <input
           value={answer}
           onChange={(event) => setAnswer(event.target.value)}
           disabled={result !== null || pending}
           autoComplete="off"
           placeholder={labels.answerPlaceholder}
-          className="h-12 rounded-md border border-neutral-800 bg-neutral-950 px-4 text-base text-white outline-none transition-colors placeholder:text-neutral-600 focus:border-brand disabled:opacity-70"
+          className="h-12 rounded-lg border border-neutral-800 bg-neutral-950 px-4 text-base text-white outline-none transition-all placeholder:text-neutral-600 focus:border-[#ff007f] focus:shadow-[0_0_0_3px_rgba(255,0,127,0.2)] disabled:opacity-70"
         />
-        <button
-          disabled={result !== null || pending}
-          className="h-12 rounded-md bg-brand px-6 text-base font-semibold text-white transition-colors hover:bg-brand-400 disabled:cursor-not-allowed disabled:bg-neutral-850 disabled:text-neutral-600"
-        >
+        <Button type="submit" disabled={result !== null || pending}>
           {labels.submitAnswer}
-        </button>
+        </Button>
       </form>
 
       {result ? (
@@ -358,10 +410,10 @@ function KaraokeTokens({ drop }: { drop: FinishLineDrop }) {
           className={[
             "transition-colors duration-150",
             index === activeIndex
-              ? "text-brand-300"
+              ? "text-[#d80069]"
               : index < activeIndex
-                ? "text-white"
-                : "text-neutral-600",
+                ? "text-[#14110f]"
+                : "text-[#14110f]/35",
           ].join(" ")}
         >
           {/* richsync tokens may omit spacing — normalize to one space between words */}
@@ -391,44 +443,66 @@ function HeatMeter({
   return (
     <div
       className={[
-        "mt-5 flex items-center justify-between gap-4 rounded-md border px-3 py-2.5 transition-colors",
+        "mt-5 rounded-xl border px-4 py-3 transition-colors",
         broken
           ? "animate-flash-out border-neutral-800 bg-neutral-950"
           : hot
-            ? "border-brand/60 bg-brand/5"
+            ? "border-[#ff007f]/60 bg-[#ff007f]/5"
             : "border-neutral-850 bg-neutral-950",
       ].join(" ")}
     >
-      <div className="min-w-0">
-        <p className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-neutral-500">
-          {labels.heatLabel}
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-neutral-400">
+          {labels.heatLabel} {hot && !broken ? "🔥" : ""}
         </p>
-        <p className="mt-0.5 truncate text-[0.7rem] text-neutral-500">
-          {broken ? labels.comboBreak : labels.heatOnHit}
-        </p>
-      </div>
-      <div className="flex items-center gap-3">
-        <div className="flex items-end gap-1" aria-hidden>
-          {Array.from({ length: MAX_HEAT }, (_, i) => (
-            <span
-              key={i}
-              className={[
-                "w-2 rounded-sm transition-colors",
-                i === 0 ? "h-2" : i === 1 ? "h-3" : "h-4",
-                i < segments ? (hot ? "bg-brand-300" : "bg-brand") : "bg-neutral-800",
-              ].join(" ")}
-            />
-          ))}
+        <div className="flex items-center gap-2">
+          {hot && !broken ? (
+            <span className="rounded-full bg-[#ff007f] px-2 py-0.5 text-[0.55rem] font-bold uppercase tracking-[0.12em] text-white">
+              On fire
+            </span>
+          ) : null}
+          <span
+            className={[
+              "font-mono text-2xl tabular-nums",
+              broken ? "text-neutral-600" : hot ? "text-[#ff8cc0]" : "text-white",
+            ].join(" ")}
+          >
+            ×{formatMultiplier(multiplier)}
+          </span>
         </div>
-        <span
-          className={[
-            "font-mono text-2xl tabular-nums",
-            broken ? "text-neutral-600" : hot ? "text-brand-300" : "text-white",
-          ].join(" ")}
-        >
-          ×{formatMultiplier(multiplier)}
-        </span>
       </div>
+      <div className="mt-2 h-3 overflow-hidden rounded-full border border-black/40 bg-neutral-900">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-[#00e5d2] via-[#ff8330] to-[#ff007f] transition-[width] duration-300"
+          style={{ width: `${segments === 0 ? 0 : Math.max(8, (segments / MAX_HEAT) * 100)}%` }}
+        />
+      </div>
+      <p className="mt-1.5 truncate font-mono text-[0.6rem] uppercase tracking-[0.15em] text-neutral-500">
+        {broken ? labels.comboBreak : labels.heatOnHit}
+      </p>
+    </div>
+  );
+}
+
+// BEATBOT, the cassette AI host — a light, always-on banter line tied to the
+// round state. (Static copy for now; ready to swap for /api/host/speak output.)
+function HostBubble({ result }: { result: RoundResult | null }) {
+  const line = result
+    ? result.correct
+      ? "Clean hit! The tape approves."
+      : "Ooh, not even close — shake it off."
+    : "Lock in and finish the line!";
+  return (
+    <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#00e5d2]/30 bg-[#00e5d2]/[0.06] px-3 py-2.5">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#ff6402] to-[#ff007f] text-sm shadow-[0_4px_14px_-4px_rgba(255,0,127,0.7)]">
+        🎙️
+      </span>
+      <p className="min-w-0">
+        <span className="block font-mono text-[0.55rem] uppercase tracking-[0.22em] text-[#7df2e8]">
+          AI Host · Beatbot
+        </span>
+        <span className="mt-0.5 block truncate text-sm text-neutral-200">{line}</span>
+      </p>
     </div>
   );
 }

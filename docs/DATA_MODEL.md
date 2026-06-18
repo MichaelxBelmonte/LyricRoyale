@@ -1,6 +1,6 @@
 # Data Model & Supabase Schema
 
-Lyric Royale persists scores, challenges, and leaderboards in Supabase (Postgres + Auth + RLS). This document is the canonical schema reference: ready-to-run DDL, Row Level Security policies, indexes, and the persisted-vs-runtime split that keeps the project compliant with Musixmatch terms.
+Soundclash persists scores, challenges, and leaderboards in Supabase (Postgres + Auth + RLS). This document is the canonical schema reference: ready-to-run DDL, Row Level Security policies, indexes, and the persisted-vs-runtime split that keeps the project compliant with Musixmatch terms.
 
 Sibling docs:
 - [`PRODUCT_SPEC.md`](./PRODUCT_SPEC.md) — vision, game modes, scoring, judging map.
@@ -47,7 +47,7 @@ Run this in the Supabase SQL editor or as a migration. It is idempotent-friendly
 
 ```sql
 -- ============================================================
--- Lyric Royale — schema (references only; NO lyric text)
+-- Soundclash — schema (references only; NO lyric text)
 -- ============================================================
 
 -- profiles: extends auth.users with display name + host persona
@@ -62,7 +62,7 @@ create table if not exists profiles (
 create table if not exists games (
   id         uuid primary key default gen_random_uuid(),
   mode       text not null check (mode in (
-               'finish_line','next_line','name_song','misheard','speed','karaoke'
+               'finish_line','the_drop','next_line','artist_pick','word_rush','name_song','karaoke'
              )),
   created_by uuid references profiles (id) on delete set null,
   config     jsonb,
@@ -288,7 +288,13 @@ References only. This is all that ever touches the database:
 At play time the server proxy fetches the lyric for `track_id` + `line_index` from Musixmatch, calls Claude (see [`PROMPTS.md`](./PROMPTS.md), prompts P1–P3) seeded with `seed`, and assembles the playable round. This object carries the prompt, options, and answer — and is shown to the player transiently, then discarded. It is **never written back** to any table.
 
 ```ts
-type RoundType = 'finish_line' | 'next_line' | 'name_song' | 'misheard' | 'speed';
+type RoundType =
+  | 'finish_line'
+  | 'the_drop'
+  | 'next_line'
+  | 'artist_pick'
+  | 'word_rush'
+  | 'name_song';
 
 interface Round {
   id: string;            // matches the persisted rounds.id
@@ -335,7 +341,7 @@ Environment variables (server-side secrets unless prefixed `NEXT_PUBLIC`):
 | `ELEVENLABS_API_KEY` | server | ElevenLabs TTS (`xi-api-key` header) |
 | `ANTHROPIC_API_KEY` | server | Claude (`claude-opus-4-8`) |
 | `SUPABASE_DB_PASSWORD` | server | Migrations / privileged DB access |
-| `SUPABASE_PROJECT_REF` | server | Supabase project reference (`twqdwrkbztwssfhaznvw`) |
+| `SUPABASE_PROJECT_REF` | server | Supabase project reference; keep the real value in `.env.local` / deployment secrets only. |
 | `NEXT_PUBLIC_SUPABASE_URL` | public | Browser Supabase client |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | public | Browser Supabase client (RLS-bounded) |
 

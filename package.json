@@ -2,26 +2,34 @@
   "name": "lyric-royale",
   "version": "0.1.0",
   "private": true,
+  "author": "michaelxbelmonte",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "soundtrack:generate": "node scripts/generate-soundtrack.mjs",
+    "soundtrack:signature": "node scripts/generate-signature.mjs",
+    "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "typecheck": "tsc --noEmit --incremental false",
     "lint": "npm run typecheck",
     "check": "npm run typecheck && npm run build"
   },
   "dependencies": {
     "next": "^15.1.6",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.5.1",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3"
+  },
+  "overrides": {
+    "postcss": "$postcss"
   }
 }

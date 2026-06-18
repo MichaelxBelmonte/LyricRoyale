@@ -6,8 +6,11 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-        // No poster display face — headings are the grotesk with tight tracking + uppercase.
         display: ["var(--font-sans)", "system-ui", "sans-serif"],
+        // Condensed poster face for mixtape-style headlines (MIX IT. CLASH IT.).
+        condensed: ["var(--font-condensed)", "var(--font-sans)", "system-ui", "sans-serif"],
+        // Handwritten marker for J-card scribbles.
+        marker: ["var(--font-marker)", "ui-sans-serif", "cursive"],
         mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {
@@ -16,18 +19,39 @@ const config: Config = {
           850: "#242428",
           925: "#111114",
         },
+        // Soundclash — exact palette sampled from the brand mood board.
+        ink: "#0b0b0b",
+        cream: "#fff1d6",
+        chrome: { DEFAULT: "#aab0ba", light: "#d8dee6", dark: "#838b97" },
+        yellow: { DEFAULT: "#ffd400", 400: "#ffdd33" },
         brand: {
-          DEFAULT: "#e5354a",
-          300: "#f4a6ae",
-          400: "#ef4d60",
-          500: "#e5354a",
-          600: "#c42a3d",
-          700: "#a11f30",
+          DEFAULT: "#ff007f",
+          300: "#ff8cc0",
+          400: "#ff3d9a",
+          500: "#ff007f",
+          600: "#d80069",
+          700: "#a8004f",
+        },
+        tangerine: {
+          DEFAULT: "#ff6402",
+          300: "#ffb37a",
+          400: "#ff8330",
+          500: "#ff6402",
+          600: "#e25500",
+        },
+        aqua: {
+          DEFAULT: "#00e5d2",
+          300: "#7df2e8",
+          400: "#2ceadb",
+          500: "#00e5d2",
+          600: "#00b8a8",
         },
       },
       boxShadow: {
-        // Minimal, flat — a faint depth cue only, no colored glow.
         card: "0 1px 2px 0 rgba(0,0,0,0.5)",
+        // Neon magenta glow for the Y2K register.
+        glow: "0 0 0 1px rgba(255,46,136,0.25), 0 12px 40px -10px rgba(255,46,136,0.55)",
+        "glow-aqua": "0 0 0 1px rgba(25,195,201,0.25), 0 12px 40px -10px rgba(25,195,201,0.5)",
       },
       keyframes: {
         "fade-up": {
@@ -52,6 +76,11 @@ const config: Config = {
           "40%": { opacity: "0.35" },
           "100%": { opacity: "1" },
         },
+        // Moving holographic sheen for the wordmark gradient.
+        shimmer: {
+          "0%": { backgroundPosition: "0% 50%" },
+          "100%": { backgroundPosition: "200% 50%" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.4s cubic-bezier(0.2,0.7,0.2,1) both",
@@ -59,6 +88,7 @@ const config: Config = {
         "blank-pulse": "blank-pulse 1.8s ease-in-out infinite",
         "slam-in": "slam-in 0.32s cubic-bezier(0.2,0.8,0.2,1) both",
         "flash-out": "flash-out 0.4s ease-out both",
+        shimmer: "shimmer 6s linear infinite",
       },
     },
   },

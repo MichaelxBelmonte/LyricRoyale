@@ -1,6 +1,6 @@
 # API Integration Guide
 
-How Lyric Royale talks to its four external providers — **Musixmatch** (lyrics), **ElevenLabs** (AI host TTS), **Anthropic Claude** (round generation, host banter, mood analysis), and **LALAL.AI** (optional karaoke stem separation).
+How Soundclash talks to its four external providers — **Musixmatch** (lyrics), **ElevenLabs** (AI host TTS), **Anthropic Claude** (round generation, host banter, mood analysis), and **LALAL.AI** (optional karaoke stem separation).
 
 Sibling docs: [`README.md`](../README.md) (stack, setup, key-safety), [`BUILD_PLAN.md`](./BUILD_PLAN.md) (5-day sequencing), [`PRODUCT_SPEC.md`](./PRODUCT_SPEC.md) (full product/data model), [`PROMPTS.md`](./PROMPTS.md) (the six Claude prompts P1–P6, all strict JSON).
 
@@ -15,7 +15,7 @@ Sibling docs: [`README.md`](../README.md) (stack, setup, key-safety), [`BUILD_PL
 | `MXM_KEY` | Musixmatch | `apikey` query param |
 | `ELEVENLABS_API_KEY` | ElevenLabs | `xi-api-key` header |
 | `ANTHROPIC_API_KEY` | Anthropic Claude | `@anthropic-ai/sdk` (reads env automatically) |
-| `LALAL_API_KEY` | LALAL.AI | `Authorization: license <key>` header |
+| `LALAL_API_KEY` | LALAL.AI API v1 | `X-License-Key` header |
 | `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_REF` | Supabase | migrations / direct Postgres only |
 
 Only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are exposed to the browser (protected by RLS). Secrets live only in `.env.local` (gitignored); on Replit they go in Secrets. **Rotate the ElevenLabs key and the Supabase DB password before submission** — both were pasted in chat at some point.
@@ -71,12 +71,14 @@ The `<LiveLyric>` component (see [`BUILD_PLAN.md`](./BUILD_PLAN.md) Day 1) highl
 
 | Game mode | Musixmatch endpoint(s) | How it is used |
 |---|---|---|
-| **Finish the Line** | `track.lyrics.get` (full) | Pick a line by `line_index`; hide the last word(s); Claude builds the prompt/answer (P1). |
-| **Next Line** | `track.lyrics.get` (full) | Show a line; Claude generates the correct following line + 3 decoys (P1). |
-| **Name That Song** | `track.lyrics.get` + `track.search` / `matcher.track.get` | Show a snippet; Claude generates correct-song + decoy options (P3). |
-| **Misheard Lyrics** | `track.lyrics.get` (full) | Real line + funny mondegreen decoys from Claude (P2). |
-| **Speed Lyrics** | `track.lyrics.get` (full) | Rapid-fire reuse of the above generators with a tight `time_limit_ms`. |
-| **Karaoke (stretch)** | `track.richsync.get` (WORD-level) + `track.subtitle.get` | Word/timing accuracy from richsync token offsets; line-level fallback from subtitle. |
+| **Finish the Line** | `track.lyrics.get` | Pick a playable lyric line, hide the last word, build 4 tap options server-side. |
+| **The Drop** | `track.lyrics.get` + `track.richsync.get` | Same missing-word mechanic, enhanced with word-level richsync timing when available. |
+| **Next Line** | `track.lyrics.get` | Show one line and build 4 deterministic choices for the line that follows. |
+| **Artist Lock** | `track.lyrics.get` + `track.search` | Show a lyric and build artist choices from the seed deck. |
+| **Word Rush** | `track.lyrics.get` | Analyze recurring lyric keywords transiently and build 4 choices. |
+| **Name That Song** | `track.lyrics.get` + `track.search` | Show a lyric and build song-title choices from the seed deck. |
+| **Stem Guess Lab** | LALAL.AI upload/split + optional Musixmatch metadata | Split a local clip and guess extracted stem vs backing. |
+| **Karaoke (stretch)** | `track.richsync.get` + `track.subtitle.get` | Word/timing accuracy from richsync token offsets; line-level fallback from subtitle. |
 
 > **Mood/theme is NOT a Musixmatch call.** `track.lyrics.mood.get` is 403 on the key — the mood/theme used to flavor host banter and round selection comes from Claude (P4) reading the full lyrics. See [§3](#3-anthropic-claude).
 
@@ -137,7 +139,7 @@ Sibling proxy routes follow the same pattern: `GET /api/mxm/search` (`track.sear
 
 ---
 
-## 2. ElevenLabs (AI host TTS)
+## 2. ElevenLabs (AI host TTS + soundtrack)
 
 The AI host (Hype-Man / Deadpan British Judge / Diva) speaks Claude-written lines at: round intro, correct answer, wrong answer, score reveal, game outro.
 
@@ -151,6 +153,7 @@ The AI host (Hype-Man / Deadpan British Judge / Diva) speaks Claude-written line
 |---|---|
 | `POST /v1/text-to-speech/{voice_id}` | One-shot synthesis → full `audio/mpeg` body. Use for pre-generated / cached banter. |
 | `POST /v1/text-to-speech/{voice_id}/stream` | Streaming variant → progressive `audio/mpeg`. Use for low-latency in-game playback. |
+| `POST /v1/music` | Prompt-to-music generation. Use offline through `npm run soundtrack:generate`, not on page load. Current default model: `music_v2`. |
 
 Map each persona to a `voice_id`. Persona selection is stored on `profiles.host_persona` (default `hype`).
 
@@ -200,6 +203,47 @@ export async function POST(req: NextRequest) {
 ```
 
 For the low-latency in-game path, swap the URL for `${ELEVEN_BASE}/text-to-speech/${voiceId}/stream` and pipe `res.body` through unchanged.
+
+### 2.4 Soundtrack generation
+
+Soundclash uses ElevenLabs Music v2 to generate reusable static audio. This is an
+asset-build step, not a runtime page feature, so credits and latency are
+controlled.
+
+```bash
+npm run soundtrack:generate
+```
+
+The script reads `ELEVENLABS_API_KEY` server-side, calls `POST /v1/music` with
+`model_id: "music_v2"`, `output_format=auto`, and `force_instrumental: true`,
+then writes:
+
+| File | Runtime use |
+|---|---|
+| `public/audio/soundclash-mixtape.mp3` | Legacy/setup instrumental loop. |
+| `public/audio/soundclash-clash.mp3` | Host/player/solo round screens. |
+
+For the personalized home sound, run:
+
+```bash
+npm run soundtrack:signature
+```
+
+This uses `ELEVENLABS_API_KEY` to generate an original vocal signature, then uses
+`LALAL_API_KEY` to upload that full mix to LALAL.AI, split `vocals`, poll until
+success, and download:
+
+| File | Runtime use |
+|---|---|
+| `public/audio/soundclash-signal-full.mp3` | Home waveform soundtrack. |
+| `public/audio/soundclash-signal-vocals.mp3` | Signal Check vocal layer. |
+| `public/audio/soundclash-signal-backing.mp3` | Signal Check backing layer. |
+
+`components/audio/AudioDirector.tsx` is the only browser playback layer. It never
+sees the provider key, attempts browser autoplay, falls back to first tap when
+blocked, alternates tracks on end, and ducks under `soundclash:duck` events
+emitted by BEATBOT voice playback. `components/audio/HomeWaveform.tsx` subscribes
+to the audio-state/analyser events and controls the same player.
 
 ---
 
@@ -258,7 +302,7 @@ export async function POST(req: NextRequest) {
     model: "claude-opus-4-8",
     max_tokens: 1024,
     thinking: { type: "adaptive" },
-    system: "You generate Lyric Royale rounds. Return STRICT JSON only. See PROMPTS.md P1.",
+    system: "You generate Soundclash rounds. Return STRICT JSON only. See PROMPTS.md P1.",
     output_config: { format: { type: "json_schema", schema: ROUND_SCHEMA } },
     messages: [{ role: "user", content: `Round type: ${roundType}\nLine: ${lyricLine}` }],
   });
@@ -276,31 +320,36 @@ The host banter route (`/api/host/banter`) uses the same client and `output_conf
 
 ---
 
-## 4. LALAL.AI (optional — karaoke stem separation)
+## 4. LALAL.AI (optional — stem mini-games / karaoke)
 
-Used **only** for the karaoke stretch, to extract a vocal stem for pitch tracking (CREPE/pYIN). It is the first thing cut if the schedule slips (risk R1 in [`BUILD_PLAN.md`](./BUILD_PLAN.md)). An alternative is the user's own Soundberry stem service. Do **not** use the user's audio-to-MIDI path (not performant).
+Used for optional stem-based mini-games and the karaoke stretch. The first implemented
+surface is `/solo/providers`: upload a short audio file, separate a stem, and play
+a blind stem/backing guessing round.
 
-- **Auth:** `Authorization: license <key>` header, reads `LALAL_API_KEY`.
-- **Flow:** upload audio → request split (stem type `vocals`) → poll for the result URL → download the isolated stem. All steps run server-side.
+- **Auth:** `X-License-Key` header, reads `LALAL_API_KEY`.
+- **Flow:** upload audio → request split (stem type `vocals`, `drum`, etc.) → poll task status → play returned track URLs. All provider calls run server-side.
+- **Current app endpoints:** `POST /api/lalal/stems` and `GET /api/lalal/stems/[taskId]`.
+- **No app persistence:** uploaded media IDs, task IDs, and result URLs are transient in the client lab.
 
 ### 4.1 Server-side fetch example (upload step)
 
 ```ts
-// app/api/karaoke/stem/route.ts  (server only — behind the karaoke feature flag)
+// app/api/lalal/stems/route.ts  (server only)
 import { NextRequest, NextResponse } from "next/server";
 
-const LALAL_BASE = "https://www.lalal.ai/api";
+const LALAL_BASE = "https://www.lalal.ai/api/v1";
 
 export async function POST(req: NextRequest) {
-  const audio = await req.arrayBuffer(); // reference audio for the chosen track
+  const form = await req.formData();
+  const file = form.get("file") as File;
 
   const upload = await fetch(`${LALAL_BASE}/upload/`, {
     method: "POST",
     headers: {
-      Authorization: `license ${process.env.LALAL_API_KEY}`, // header auth, server-side only
-      "Content-Disposition": 'attachment; filename="track.mp3"',
+      "X-License-Key": process.env.LALAL_API_KEY!, // server-side only
+      "Content-Disposition": `attachment; filename="${file.name}"`,
     },
-    body: audio,
+    body: Buffer.from(await file.arrayBuffer()),
   });
 
   if (!upload.ok) {
@@ -308,7 +357,8 @@ export async function POST(req: NextRequest) {
   }
 
   const { id } = (await upload.json()) as { id: string };
-  // Next: POST /api/split/ with stem "vocals", then poll /api/check/ for the stem URL.
+  // Next: POST /api/v1/split/stem_separator/ with { source_id, presets: { stem } },
+  // then poll /api/v1/check/ with { task_ids: [task_id] }.
   return NextResponse.json({ uploadId: id });
 }
 ```
@@ -322,6 +372,6 @@ export async function POST(req: NextRequest) {
 | `GET /api/mxm/*` (search, lyrics, subtitle, richsync, match) | `MXM_KEY` | `apikey` query param |
 | `POST /api/host/tts` (one-shot + `/stream`) | `ELEVENLABS_API_KEY` | `xi-api-key` header |
 | `POST /api/round/generate`, `/api/host/banter`, `/api/mood` | `ANTHROPIC_API_KEY` | `@anthropic-ai/sdk` (env) |
-| `POST /api/karaoke/stem` (optional) | `LALAL_API_KEY` | `Authorization: license <key>` |
+| `POST /api/lalal/stems`, `GET /api/lalal/stems/[taskId]` | `LALAL_API_KEY` | `X-License-Key` |
 
-No provider key is ever sent to the browser. The client only ever calls Lyric Royale's own `/api/**` routes; the routes proxy to the providers using the server-side secrets above.
+No provider key is ever sent to the browser. The client only ever calls Soundclash's own `/api/**` routes; the routes proxy to the providers using the server-side secrets above.

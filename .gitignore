@@ -28,3 +28,5 @@ pnpm-debug.log*
 # Artefatti audio di test
 *.mp3
 *.wav
+!public/audio/
+!public/audio/*.mp3

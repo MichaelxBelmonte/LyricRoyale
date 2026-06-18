@@ -167,6 +167,15 @@ export async function searchTracks(query: string, limit = 8): Promise<TrackSumma
     .filter((track): track is TrackSummary => track !== null);
 }
 
+// Fetch track metadata by id — lets a challenge link carry only the trackId
+// (a reference) and rebuild the TrackSummary live on the recipient's device.
+export async function getTrack(trackId: number): Promise<TrackSummary> {
+  const body = await callMusixmatch<{ track?: RawTrack }>("track.get", { track_id: trackId });
+  const summary = toTrackSummary(body.track);
+  if (!summary) throw new MusixmatchProviderError(`No track metadata for ${trackId}`);
+  return summary;
+}
+
 export async function getTrackLyrics(trackId: number): Promise<LyricsPayload> {
   const body = await callMusixmatch<LyricsBody>("track.lyrics.get", { track_id: trackId });
   const lyrics = body.lyrics;

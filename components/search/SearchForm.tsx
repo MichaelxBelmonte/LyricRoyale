@@ -1,6 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
+import Button from "@/components/brand/Button";
 import Icon from "@/components/ui/Icon";
 
 interface SearchFormProps {
@@ -24,12 +25,12 @@ export default function SearchForm({
   onSubmit,
 }: SearchFormProps) {
   return (
-    <form onSubmit={onSubmit} className="grid gap-2 sm:grid-cols-[1fr_auto]">
+    <form onSubmit={onSubmit} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
       <label className="sr-only" htmlFor="song-search">
         {labels.searchLabel}
       </label>
       <div className="relative">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-black/35">
           <Icon name="search" size={16} />
         </span>
         <input
@@ -38,16 +39,12 @@ export default function SearchForm({
           autoComplete="off"
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder={labels.searchPlaceholder}
-          className="h-12 w-full rounded-md border border-neutral-800 bg-neutral-950 pl-9 pr-3 text-base text-white outline-none transition-colors placeholder:text-neutral-600 focus:border-brand"
+          className="h-12 w-full rounded-lg border border-black/15 bg-white pl-9 pr-3 text-base text-[#0b0b0b] outline-none transition-colors placeholder:text-black/35 focus:border-[#ff007f] focus:shadow-[0_0_0_3px_rgba(255,0,127,0.15)]"
         />
       </div>
-      <button
-        type="submit"
-        disabled={loading}
-        className="h-12 rounded-md bg-brand px-6 text-base font-semibold text-white transition-colors hover:bg-brand-400 disabled:cursor-not-allowed disabled:bg-neutral-850 disabled:text-neutral-600"
-      >
+      <Button type="submit" disabled={loading}>
         {loading ? labels.searchingButton : labels.searchButton}
-      </button>
+      </Button>
     </form>
   );
 }

@@ -1,6 +1,6 @@
 # Contest Rules — Musicathon 2026
 
-> Faithful transcription of the official **Musicathon 2026 Contest Rules** (23 sections · "Updated May 12" · Binding: Yes), as provided in the organizer's screenshots. The organizer's official published rules are the authoritative source; this file is a working copy for the team. See [`COMPLIANCE.md`](./COMPLIANCE.md) for how these rules translate into engineering constraints.
+> Faithful transcription of the official **Musicathon 2026 Contest Rules** (23 sections · "Updated May 12" · Binding: Yes), as provided in the organizer's screenshots. Store the redacted source screenshots in [`rules-screenshots/`](./rules-screenshots/) before the repo goes public. The organizer's official published rules are the authoritative source; this file is a working copy for the team. See [`COMPLIANCE.md`](./COMPLIANCE.md) for how these rules translate into engineering constraints.
 
 > ⚠️ **Date discrepancy (read this).** The rules are internally inconsistent on the deadline: the **Overview** says the hackathon runs **June 15 → 22** with submissions closing **23:59 CET, June 22**, but **Contest Period**, **Entry Requirements**, and **Winner Selection** all say **June 21, 2026 (23:59 CEST)**. Three of four sections say **June 21** — treat **21 June 2026, 23:59 CEST** as the working deadline and confirm with the organizer.
 
@@ -97,7 +97,7 @@ Nothing in these Official Rules is intended to limit or exclude any mandatory co
 
 ---
 
-## What this means for Lyric Royale (engineering implications)
+## What this means for Soundclash (engineering implications)
 These map directly onto our build — full detail in [`COMPLIANCE.md`](./COMPLIANCE.md):
 - **Must use Musixmatch meaningfully** (§5, §9) → lyrics + synced lyrics are the core game material. ✅
 - **No persistent storage / no redistribution / real-time display only** (§14) → we persist **references only** (`track_id + line_index + round_type + seed`), regenerate lyric text **live**, and never store or share lyric text. See [`DATA_MODEL.md`](./DATA_MODEL.md).
