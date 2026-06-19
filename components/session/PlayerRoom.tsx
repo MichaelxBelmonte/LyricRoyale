@@ -117,7 +117,7 @@ export default function PlayerRoom({ code }: { code: string }) {
               className="h-9 w-9 rounded-lg border border-white/10 transition-opacity hover:opacity-80"
             />
           </Link>
-          <Avatar name={me?.name ?? "Player"} size="lg" />
+          <Avatar name={me?.name ?? "Player"} emoji={me?.avatar} size="lg" />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">{me?.name ?? "Player"}</p>
             <p className="font-mono text-xs text-neutral-500">Room {code}</p>

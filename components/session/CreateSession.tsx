@@ -7,6 +7,7 @@ import HomeLogo from "@/components/brand/HomeLogo";
 import JCard from "@/components/brand/JCard";
 import Sticker from "@/components/brand/Sticker";
 import type { PublicSessionState } from "@/lib/session/types";
+import type { Locale } from "@/lib/types";
 
 const FIELD =
   "mt-2 h-12 w-full rounded-lg border border-black/15 bg-white px-3 text-[#0b0b0b] outline-none transition-colors placeholder:text-black/35 focus:border-[#ff007f] focus:shadow-[0_0_0_3px_rgba(255,0,127,0.15)]";
@@ -21,6 +22,7 @@ export default function CreateSession() {
   const router = useRouter();
   const [hostName, setHostName] = useState("Soundclash Host");
   const [voice, setVoice] = useState("hype");
+  const [locale, setLocale] = useState<Locale>("en");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +34,7 @@ export default function CreateSession() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          locale,
           hostName,
           voice: {
             preset: voice,
@@ -96,6 +99,41 @@ export default function CreateSession() {
                 );
               })}
             </div>
+          </div>
+
+          <div className="mt-5">
+            <p className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-black/45">
+              Host language
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {(
+                [
+                  ["en", "English"],
+                  ["it", "Italiano"],
+                ] as [Locale, string][]
+              ).map(([value, label]) => {
+                const selected = locale === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setLocale(value)}
+                    aria-pressed={selected}
+                    className={[
+                      "h-12 rounded-lg border px-3 font-condensed text-sm uppercase tracking-[0.04em] transition-colors",
+                      selected
+                        ? "border-[#ff007f] bg-[#ff007f]/10 text-[#d80069]"
+                        : "border-black/15 bg-white text-black/70 hover:border-black/40 hover:text-black",
+                    ].join(" ")}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-xs text-black/50">
+              BEATBOT speaks and roasts in this language. You&rsquo;ll pick the mini-games next, in the room.
+            </p>
           </div>
 
           {error ? <p className="mt-4 text-sm font-semibold text-[#d80069]">{error}</p> : null}

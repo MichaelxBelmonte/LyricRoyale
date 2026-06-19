@@ -1,5 +1,5 @@
-// Monogram avatar — initials in a mono badge. Replaces emoji for a minimal,
-// professional identity mark.
+// Player identity mark — a chosen emoji avatar, falling back to monogram initials
+// when none is set. Used on the host roster, scoreboard, and player controller.
 
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -10,29 +10,43 @@ export function initials(name: string): string {
 
 interface AvatarProps {
   name: string;
+  emoji?: string;
   size?: "sm" | "md" | "lg";
   active?: boolean;
 }
 
 const SIZES: Record<NonNullable<AvatarProps["size"]>, string> = {
-  sm: "h-7 w-7 text-[0.7rem]",
-  md: "h-11 w-11 text-sm",
-  lg: "h-14 w-14 text-base",
+  sm: "h-7 w-7",
+  md: "h-11 w-11",
+  lg: "h-14 w-14",
 };
 
-export default function Avatar({ name, size = "md", active = false }: AvatarProps) {
+const TEXT: Record<NonNullable<AvatarProps["size"]>, string> = {
+  sm: "text-[0.7rem]",
+  md: "text-sm",
+  lg: "text-base",
+};
+
+const EMOJI_TEXT: Record<NonNullable<AvatarProps["size"]>, string> = {
+  sm: "text-base",
+  md: "text-xl",
+  lg: "text-3xl",
+};
+
+export default function Avatar({ name, emoji, size = "md", active = false }: AvatarProps) {
   return (
     <span
       className={[
-        "inline-flex shrink-0 items-center justify-center rounded-md border font-mono font-medium tabular-nums",
+        "inline-flex shrink-0 items-center justify-center rounded-md border font-mono font-medium tabular-nums leading-none",
         SIZES[size],
+        emoji ? EMOJI_TEXT[size] : TEXT[size],
         active
           ? "border-brand/60 bg-brand/10 text-brand-300"
           : "border-neutral-800 bg-neutral-925 text-neutral-300",
       ].join(" ")}
       aria-hidden="true"
     >
-      {initials(name)}
+      {emoji ?? initials(name)}
     </span>
   );
 }

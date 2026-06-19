@@ -7,7 +7,10 @@ export type MiniGameId =
   | "next_line"
   | "artist_pick"
   | "word_rush"
-  | "name_song";
+  | "name_song"
+  | "mondegreen"
+  | "song_mash"
+  | "on_beat";
 export type HostVoicePreset = "hype" | "judge" | "diva" | "custom";
 export type RoundAnswerType = "text" | "choice";
 
@@ -27,6 +30,7 @@ export interface HostVoiceConfig {
 export interface SessionPlayer {
   id: string;
   name: string;
+  avatar: string;
   score: number;
   joinedAt: number;
   lastSeenAt: number;
@@ -89,10 +93,12 @@ export interface CreateSessionInput {
   hostName?: string;
   voice?: Partial<HostVoiceConfig>;
   autopilot?: boolean;
+  miniGames?: MiniGameId[];
 }
 
 export interface JoinSessionInput {
   name?: string;
+  avatar?: string;
 }
 
 export interface StartRoundInput {

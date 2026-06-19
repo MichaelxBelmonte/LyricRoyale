@@ -12,6 +12,7 @@ This README is the front door. Each sibling doc below owns one slice of the proj
 |---|---|
 | [`CONTEST_RULES.md`](./CONTEST_RULES.md) | The official Musicathon 2026 rules (eligibility, requirements, judging, prizes, content-usage restrictions) — the source of every project constraint. |
 | [`ARCHITECTURE.md`](./ARCHITECTURE.md) | System design: Next.js server-only provider proxy, route handlers, data flow, deployment on Replit. |
+| [`DEPLOY_REPLIT.md`](./DEPLOY_REPLIT.md) | How to publish: Replit **Reserved VM** (not Autoscale), build/run commands, secrets, online multiplayer test. |
 | [`PRODUCT_SPEC.md`](./PRODUCT_SPEC.md) | Game modes (MVP + stretch karaoke), the AI host personas, social loop, scoring, and the feature → judging-criteria map. |
 | [`BRAND_SYSTEM.md`](./BRAND_SYSTEM.md) | Soundclash visual system: cassette/J-card/Y2K palette, materials, typography, UI rules, and next brand-alignment tasks. |
 | [`PARTY_ROOM_PLAN.md`](./PARTY_ROOM_PLAN.md) | Current pivot plan: shared-screen host, phone controllers, room APIs, ElevenLabs voice host, and LALAL.AI mini-game path. |

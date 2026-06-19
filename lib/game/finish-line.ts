@@ -294,6 +294,138 @@ export function buildWordRushRound(input: {
   };
 }
 
+function pickDistinct(pool: string[], avoid: string[], seed: number): string | null {
+  const avoidSet = new Set(avoid.map(normalizeAnswer));
+  const candidates = uniqueByNormalized(pool).filter(
+    (word) => !avoidSet.has(normalizeAnswer(word)) && normalizeAnswer(word).length >= 2,
+  );
+  if (candidates.length === 0) return null;
+  return candidates[seededIndex(seed, candidates.length)];
+}
+
+// Replace the last word of a line with another real word from the song. Returns
+// null when no swap is possible or the result is not distinct after normalizing.
+function swapLastWord(line: string, pool: string[], seed: number): string | null {
+  const match = line.match(LAST_WORD);
+  if (!match) return null;
+  const replacement = pickDistinct(pool, [match[1]], seed);
+  if (!replacement) return null;
+  const candidate = line.replace(LAST_WORD, `${replacement}$2`);
+  return normalizeAnswer(candidate) === normalizeAnswer(line) ? null : candidate;
+}
+
+// Replace one interior word (never the first/last) with another real word.
+function swapInnerWord(line: string, pool: string[], seed: number): string | null {
+  const words = line.split(/\s+/);
+  if (words.length < 3) return null;
+  const innerIndexes: number[] = [];
+  for (let i = 1; i < words.length - 1; i++) {
+    if ((words[i].match(WORD) ?? []).length) innerIndexes.push(i);
+  }
+  if (innerIndexes.length === 0) return null;
+  const target = innerIndexes[seededIndex(seed, innerIndexes.length)];
+  const replacement = pickDistinct(pool, [words[target]], seed + 3);
+  if (!replacement) return null;
+  const token = words[target].match(/^([\p{L}\p{N}][\p{L}\p{N}'’-]*)(.*)$/u);
+  words[target] = token ? `${replacement}${token[2]}` : replacement;
+  const candidate = words.join(" ");
+  return normalizeAnswer(candidate) === normalizeAnswer(line) ? null : candidate;
+}
+
+// Swap two adjacent words. Changes the normalized character order, so the result
+// is distinct unless the two words are identical.
+function swapAdjacent(line: string, seed: number): string | null {
+  const words = line.split(/\s+/);
+  if (words.length < 2) return null;
+  const i = seededIndex(seed, words.length - 1);
+  [words[i], words[i + 1]] = [words[i + 1], words[i]];
+  const candidate = words.join(" ");
+  return normalizeAnswer(candidate) === normalizeAnswer(line) ? null : candidate;
+}
+
+// Count distinctive content words (>=5 chars, not stop-words) — higher means a
+// more recognizable line, good for "which song is this from?".
+function contentScore(line: string): number {
+  let score = 0;
+  for (const raw of line.match(WORD) ?? []) {
+    const key = normalizeAnswer(raw);
+    if (key.length >= 5 && !STOP_WORDS.has(raw.toLowerCase()) && !STOP_WORDS.has(key)) score += 1;
+  }
+  return score;
+}
+
+export function buildMondegreenRound(input: {
+  trackId: number;
+  seed?: number;
+  lyrics: string;
+  copyright: string;
+  tracking: TrackingLinks;
+}) {
+  const lines = uniqueByNormalized(lyricLines(input.lyrics)).filter(
+    (line) => (line.match(WORD) ?? []).length >= 4,
+  );
+  if (lines.length === 0) throw new Error("No playable mondegreen lines found");
+
+  const seed = Math.max(0, input.seed ?? 0);
+  const real = lines[seededIndex(seed, lines.length, input.trackId)];
+  const wordPool = lines.flatMap((line) => line.match(WORD) ?? []);
+  const lastWords = lines
+    .map((line) => line.match(LAST_WORD)?.[1])
+    .filter((word): word is string => Boolean(word));
+
+  const decoys = [
+    swapLastWord(real, lastWords, seed + input.trackId),
+    swapInnerWord(real, wordPool, seed + input.trackId + 5),
+    swapAdjacent(real, seed + input.trackId + 9),
+  ].filter((decoy): decoy is string => Boolean(decoy));
+
+  const options = uniqueByNormalized([real, ...decoys]);
+  if (options.length < 4) throw new Error("Could not build 3 distinct mondegreen decoys");
+
+  return {
+    prompt: "Which line is the real lyric?",
+    answer: real,
+    options: shuffled(options.slice(0, 4), seed + 7),
+    copyright: input.copyright,
+    tracking: input.tracking,
+  };
+}
+
+export function buildSongMashRound(input: {
+  track: TrackSummary;
+  seed?: number;
+  lyrics: string;
+  copyright: string;
+  tracking: TrackingLinks;
+  deck: TrackSummary[];
+}) {
+  const names = uniqueByNormalized(input.deck.map((track) => track.trackName));
+  if (names.length < 4) throw new Error("Need at least 4 tracks in the deck for song mash");
+
+  const lines = uniqueByNormalized(lyricLines(input.lyrics));
+  if (lines.length === 0) throw new Error("No playable lyric lines found");
+
+  const seed = Math.max(0, input.seed ?? 0);
+  // Pick from the most distinctive lines so the lyric is recognizable.
+  const ranked = [...lines].sort((a, b) => contentScore(b) - contentScore(a));
+  const prompt = ranked[seededIndex(seed, Math.min(5, ranked.length), input.track.trackId)];
+
+  const decoys = shuffled(
+    names.filter((name) => normalizeAnswer(name) !== normalizeAnswer(input.track.trackName)),
+    seed + input.track.trackId,
+  ).slice(0, 3);
+  const options = shuffled(uniqueByNormalized([input.track.trackName, ...decoys]).slice(0, 4), seed + 29);
+  if (options.length < 4) throw new Error("Not enough distinct track names for song mash");
+
+  return {
+    prompt,
+    answer: input.track.trackName,
+    options,
+    copyright: input.copyright,
+    tracking: input.tracking,
+  };
+}
+
 /**
  * Build "The Drop" timing for a chosen lyric line by matching it to a richsync
  * line and locating the answer word's token. Returns the PREFIX tokens (never the

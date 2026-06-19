@@ -3,15 +3,19 @@ import "server-only";
 import {
   buildArtistPickRound,
   buildFinishLineRound,
+  buildMondegreenRound,
   buildNameSongRound,
   buildNextLineRound,
+  buildSongMashRound,
   buildWordRushRound,
   computeDrop,
   normalizeAnswer,
 } from "@/lib/game/finish-line";
-import { ROUND_TIME_LIMIT_MS, scoreFinishLine } from "@/lib/game/scoring";
+import { ROUND_TIME_LIMIT_MS, scoreFinishLine, scoreRound } from "@/lib/game/scoring";
 import { getRichsyncLines, getTrackLyrics } from "@/lib/server/musixmatch";
-import type { Locale, TrackSummary } from "@/lib/types";
+import { avatarForIndex, isPlayerAvatar } from "@/lib/session/avatars";
+import { ALL_MINI_GAME_IDS, orderMiniGames } from "@/lib/session/mini-games";
+import type { FinishLineDrop, Locale, TrackSummary } from "@/lib/types";
 import type {
   CreateSessionInput,
   HostVoiceConfig,
@@ -32,14 +36,7 @@ const DEFAULT_VOICE: HostVoiceConfig = {
   label: "Hype Host",
 };
 
-const DEFAULT_MINI_GAMES: MiniGameId[] = [
-  "finish_line",
-  "the_drop",
-  "next_line",
-  "artist_pick",
-  "word_rush",
-  "name_song",
-];
+const DEFAULT_MINI_GAMES: MiniGameId[] = ALL_MINI_GAME_IDS;
 
 type Store = Map<string, PartySession>;
 
@@ -96,6 +93,7 @@ function publicState(session: PartySession): PublicSessionState {
 
 export function createSession(input: CreateSessionInput = {}): PublicSessionState {
   const createdAt = now();
+  const requestedGames = orderMiniGames(input.miniGames ?? []);
   const session: PartySession = {
     code: code(),
     status: "lobby",
@@ -106,7 +104,7 @@ export function createSession(input: CreateSessionInput = {}): PublicSessionStat
       ...input.voice,
       label: input.voice?.label?.trim() || DEFAULT_VOICE.label,
     },
-    miniGames: DEFAULT_MINI_GAMES,
+    miniGames: requestedGames.length ? requestedGames : DEFAULT_MINI_GAMES,
     autopilot: input.autopilot ?? true,
     trackPool: [],
     players: [],
@@ -129,6 +127,7 @@ export function joinSession(sessionCode: string, input: JoinSessionInput = {}) {
   const player: SessionPlayer = {
     id: playerId(),
     name: baseName.slice(0, 24),
+    avatar: isPlayerAvatar(input.avatar) ? input.avatar : avatarForIndex(session.players.length),
     score: 0,
     joinedAt,
     lastSeenAt: joinedAt,
@@ -167,12 +166,14 @@ function cleanDeck(deck: SessionTrackRef[] | undefined): SessionTrackRef[] {
     .slice(0, 8);
 }
 
+const NEEDS_RICHSYNC = new Set<MiniGameId>(["the_drop", "on_beat"]);
+
 function nextMiniGame(session: PartySession, requested: MiniGameId | undefined, hasRichsync: boolean): MiniGameId {
-  if (requested) return requested === "the_drop" && !hasRichsync ? "finish_line" : requested;
+  if (requested) return NEEDS_RICHSYNC.has(requested) && !hasRichsync ? "finish_line" : requested;
   const nextIndex = session.currentRound?.index ?? 0;
   const cycle = session.miniGames.length ? session.miniGames : DEFAULT_MINI_GAMES;
   const selected = cycle[nextIndex % cycle.length];
-  return selected === "the_drop" && !hasRichsync ? "finish_line" : selected;
+  return NEEDS_RICHSYNC.has(selected) && !hasRichsync ? "finish_line" : selected;
 }
 
 function labelsFor(miniGame: MiniGameId) {
@@ -204,6 +205,24 @@ function labelsFor(miniGame: MiniGameId) {
     return {
       title: "The Drop",
       instruction: "Tap the missing word as the lyric lands.",
+    };
+  }
+  if (miniGame === "on_beat") {
+    return {
+      title: "On The Beat",
+      instruction: "Lock the word right as the beat hits — timing scores.",
+    };
+  }
+  if (miniGame === "mondegreen") {
+    return {
+      title: "Misheard",
+      instruction: "One line is the real lyric. The rest are mondegreens.",
+    };
+  }
+  if (miniGame === "song_mash") {
+    return {
+      title: "Who Said It",
+      instruction: "Which track dropped this line?",
     };
   }
   return {
@@ -311,6 +330,42 @@ async function buildSessionRound(input: {
     };
   }
 
+  if (input.miniGame === "mondegreen") {
+    const mondegreen = buildMondegreenRound({
+      trackId: input.track.trackId,
+      seed: input.seed,
+      lyrics: lyrics.body,
+      copyright: lyrics.copyright,
+      tracking: lyrics.tracking,
+    });
+    return {
+      ...base,
+      prompt: mondegreen.prompt,
+      answerType: "choice",
+      options: mondegreen.options,
+      solution: mondegreen.answer,
+    };
+  }
+
+  if (input.miniGame === "song_mash") {
+    const deck = input.session.trackPool.length ? input.session.trackPool : [input.track];
+    const songMash = buildSongMashRound({
+      track: toTrackSummary(input.track),
+      seed: input.seed,
+      lyrics: lyrics.body,
+      copyright: lyrics.copyright,
+      tracking: lyrics.tracking,
+      deck: deck.map(toTrackSummary),
+    });
+    return {
+      ...base,
+      prompt: songMash.prompt,
+      answerType: "choice",
+      options: songMash.options,
+      solution: songMash.answer,
+    };
+  }
+
   const generated = buildFinishLineRound({
     trackId: input.track.trackId,
     seed: input.seed,
@@ -319,13 +374,12 @@ async function buildSessionRound(input: {
     tracking: lyrics.tracking,
   });
 
-  let prompt = generated.round.prompt;
+  const prompt = generated.round.prompt;
   let drop: SessionRound["drop"];
-  if (input.miniGame === "the_drop") {
+  if (input.miniGame === "the_drop" || input.miniGame === "on_beat") {
     try {
       const richsyncLines = await getRichsyncLines(input.track.trackId);
       drop = computeDrop(generated.line, generated.answer, richsyncLines) ?? undefined;
-      prompt = drop ? generated.round.prompt : generated.round.prompt;
     } catch {
       // No richsync: keep the same lyric prompt and play as a timing-lite round.
     }
@@ -386,6 +440,18 @@ export async function startRound(sessionCode: string, input: StartRoundInput): P
   return publicState(session);
 }
 
+// "On The Beat" proximity: map the player's elapsed time onto the looping karaoke
+// cycle and measure the (circular) distance to the drop offset, in ms. Mirrors the
+// host's KaraokeTokens cycle so the timing bonus matches what players watch on the TV.
+function onBeatProximityMs(drop: FinishLineDrop, elapsedMs: number): number {
+  const lastOffset = drop.tokens.length ? drop.tokens[drop.tokens.length - 1].offset : 0;
+  const cycle = Math.max(drop.lineDuration, drop.dropOffset + 0.6, lastOffset + 0.6);
+  const loopPos = (elapsedMs / 1000) % cycle;
+  const raw = Math.abs(loopPos - drop.dropOffset);
+  const circular = Math.min(raw, cycle - raw);
+  return circular * 1000;
+}
+
 export async function submitAnswer(sessionCode: string, input: SubmitAnswerInput) {
   const session = assertSession(sessionCode);
   const round = session.currentRound;
@@ -402,7 +468,15 @@ export async function submitAnswer(sessionCode: string, input: SubmitAnswerInput
   const elapsedMs = Math.min(Math.max(0, submittedAt - round.startedAt), ROUND_TIME_LIMIT_MS);
   const solution = round.solution ?? "";
   const correct = normalizeAnswer(guess) === normalizeAnswer(solution);
-  const points = scoreFinishLine(correct, elapsedMs);
+  const points =
+    round.miniGame === "on_beat" && round.drop
+      ? scoreRound({
+          isCorrect: correct,
+          elapsedMs,
+          streak: correct ? 1 : 0,
+          dropProximityMs: onBeatProximityMs(round.drop, elapsedMs),
+        }).total
+      : scoreFinishLine(correct, elapsedMs);
   const answer: SessionAnswer = {
     playerId: player.id,
     playerName: player.name,
@@ -424,6 +498,14 @@ export function revealRound(sessionCode: string): PublicSessionState {
   const session = assertSession(sessionCode);
   if (session.currentRound) session.currentRound.status = "revealed";
   session.status = "results";
+  session.updatedAt = now();
+  return publicState(session);
+}
+
+export function setMiniGames(sessionCode: string, ids: MiniGameId[]): PublicSessionState {
+  const session = assertSession(sessionCode);
+  const ordered = orderMiniGames(ids ?? []);
+  if (ordered.length) session.miniGames = ordered;
   session.updatedAt = now();
   return publicState(session);
 }

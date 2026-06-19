@@ -14,6 +14,7 @@ export type IconName =
   | "skipForward"
   | "volume2"
   | "volumeX"
+  | "stop"
   | "users"
   | "logout"
   | "pencil"
@@ -34,6 +35,7 @@ const PATHS: Record<IconName, string> = {
   skipForward: '<path d="m5 4 10 8-10 8Z"/><path d="M19 5v14"/>',
   volume2: '<path d="M11 5 6 9H2v6h4l5 4Z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>',
   volumeX: '<path d="M11 5 6 9H2v6h4l5 4Z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="1.5"/>',
   users:
     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',

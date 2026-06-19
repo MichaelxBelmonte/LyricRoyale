@@ -7,11 +7,22 @@ import { SOUNDTRACKS, soundtrackForPath, type SoundtrackId } from "@/lib/audio/s
 
 const STORE_KEY = "soundclash-audio";
 const BASE_VOLUME = 0.42;
-const DUCK_VOLUME = 0.14;
+// While the host AI is talking the music ducks to this fraction of its set volume,
+// so the voice is always clearly on top without cutting the music entirely.
+const DUCK_FACTOR = 0.22;
 const BARS = 32;
 
-type StoredAudio = { stopped?: boolean };
-type AudioControl = "play" | "pause" | "toggle" | "next" | "seek" | "track";
+type StoredAudio = { stopped?: boolean; volume?: number; muted?: boolean };
+type AudioControl = "play" | "pause" | "toggle" | "next" | "seek" | "track" | "volume" | "mute";
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function effectiveVolume(volume: number, ducked: boolean, muted: boolean): number {
+  if (muted) return 0;
+  return clamp01(volume) * (ducked ? DUCK_FACTOR : 1);
+}
 
 function loadStoredAudio(): StoredAudio {
   try {
@@ -21,8 +32,8 @@ function loadStoredAudio(): StoredAudio {
   }
 }
 
-function saveStopped(stopped: boolean) {
-  window.localStorage.setItem(STORE_KEY, JSON.stringify({ stopped }));
+function persistAudio(patch: StoredAudio) {
+  window.localStorage.setItem(STORE_KEY, JSON.stringify({ ...loadStoredAudio(), ...patch }));
 }
 
 export default function AudioDirector() {
@@ -40,6 +51,17 @@ export default function AudioDirector() {
   const [ducked, setDucked] = useState(false);
   const [trackIndex, setTrackIndex] = useState(0);
   const [ready, setReady] = useState(false);
+  const [volume, setVolume] = useState(BASE_VOLUME);
+  const [muted, setMuted] = useState(false);
+  const volumeRef = useRef(BASE_VOLUME);
+  const mutedRef = useRef(false);
+
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
 
   const preferredIndex = useMemo(() => {
     const preferred = soundtrackForPath(pathname);
@@ -63,6 +85,8 @@ export default function AudioDirector() {
           trackIndex,
           currentTime: audio?.currentTime ?? 0,
           duration: Number.isFinite(audio?.duration) ? audio?.duration : 0,
+          volume: volumeRef.current,
+          muted: mutedRef.current,
         },
       }),
     );
@@ -122,10 +146,10 @@ export default function AudioDirector() {
       if (!audio) return;
       try {
         await ensureAnalyser();
-        audio.volume = ducked ? DUCK_VOLUME : BASE_VOLUME;
+        audio.volume = effectiveVolume(volume, ducked, muted);
         await audio.play();
         stoppedRef.current = false;
-        if (userIntent) saveStopped(false);
+        if (userIntent) persistAudio({ stopped: false });
         setEnabled(true);
         setBlocked(false);
         startVisualizer();
@@ -136,7 +160,7 @@ export default function AudioDirector() {
         dispatchState();
       }
     },
-    [dispatchState, ducked, ensureAnalyser, setEnabled, startVisualizer],
+    [dispatchState, ducked, ensureAnalyser, muted, setEnabled, startVisualizer, volume],
   );
 
   const pauseAudio = useCallback(
@@ -144,7 +168,7 @@ export default function AudioDirector() {
       audioRef.current?.pause();
       if (userIntent) {
         stoppedRef.current = true;
-        saveStopped(true);
+        persistAudio({ stopped: true });
       }
       setEnabled(false);
       stopVisualizer();
@@ -164,10 +188,16 @@ export default function AudioDirector() {
   useEffect(() => {
     const stored = loadStoredAudio();
     stoppedRef.current = Boolean(stored.stopped);
+    if (typeof stored.volume === "number") setVolume(clamp01(stored.volume));
+    if (typeof stored.muted === "boolean") setMuted(stored.muted);
     setTrackIndex(preferredIndex);
     setReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (ready) persistAudio({ volume, muted });
+  }, [volume, muted, ready]);
 
   useEffect(() => {
     if (!ready) return;
@@ -179,7 +209,7 @@ export default function AudioDirector() {
     if (!audio || !ready) return;
     audio.src = track.src;
     audio.load();
-    audio.volume = ducked ? DUCK_VOLUME : BASE_VOLUME;
+    audio.volume = effectiveVolume(volume, ducked, muted);
     if (enabledRef.current || !stoppedRef.current) void playAudioRef.current?.(false);
     // Track loading must not depend on ducking; volume changes are handled below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,8 +218,8 @@ export default function AudioDirector() {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !ready) return;
-    audio.volume = ducked ? DUCK_VOLUME : BASE_VOLUME;
-  }, [ducked, ready]);
+    audio.volume = effectiveVolume(volume, ducked, muted);
+  }, [ducked, ready, volume, muted]);
 
   useEffect(() => {
     if (!ready || enabled || stoppedRef.current) return;
@@ -208,19 +238,21 @@ export default function AudioDirector() {
       setDucked(Boolean(detail?.active));
     };
     const onControl = (event: Event) => {
-      const detail = (event as CustomEvent<{ action?: AudioControl; ratio?: number; trackId?: SoundtrackId; play?: boolean }>).detail;
+      const detail = (event as CustomEvent<{ action?: AudioControl; ratio?: number; trackId?: SoundtrackId; play?: boolean; value?: number | boolean }>).detail;
       const action = detail?.action;
       if (action === "play") void playAudio(true);
       if (action === "pause") pauseAudio(true);
       if (action === "toggle") void (enabledRef.current ? pauseAudio(true) : playAudio(true));
       if (action === "next") nextTrack();
+      if (action === "volume" && typeof detail.value === "number") setVolume(clamp01(detail.value));
+      if (action === "mute") setMuted(typeof detail.value === "boolean" ? detail.value : !mutedRef.current);
       if (action === "track") {
         const trackId = detail.trackId;
         const index = SOUNDTRACKS.findIndex((item) => item.id === trackId);
         if (index >= 0) {
           if (detail.play !== false) {
             stoppedRef.current = false;
-            saveStopped(false);
+            persistAudio({ stopped: false });
           }
           if (index === trackIndex) {
             if (detail.play !== false) void playAudio(true);

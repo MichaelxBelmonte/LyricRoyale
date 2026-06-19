@@ -18,6 +18,35 @@ cyber teal, electric tangerine, LED scoreboards, stickers, and tape-label UI.
 - A personalized ElevenLabs Music v2 signature powers the animated home waveform.
 - LALAL.AI split assets are kept for the upcoming Signal Check micro-game, but the home currently plays only the full mix.
 
+## Mini-games
+
+The autopilot rotates a 6-round set drawn from this catalog (all lyric-based, mostly tap input):
+
+| Game | What you do |
+|---|---|
+| Finish the Line | Tap the missing last word |
+| Misheard | Spot the real lyric among the mondegreens |
+| The Drop | Hit the word as the lyric lands |
+| On The Beat | Lock the word right as the beat hits — timing scores |
+| Who Said It | Which track dropped this line? |
+| Next Line | Pick the line that comes next |
+| Name That Song | Match the lyric to its track |
+| Artist Lock | Pick the artist behind the lyric |
+| Word Rush | Pick the recurring keyword |
+
+A "coming soon" gallery (Stem Heist, Beat Roulette, Karaoke Clash, Rap Battle) is shown in the
+host picker for the pitch but never enters rotation.
+
+## Online & multiplayer
+
+- One host on a shared screen/TV; everyone else plays from their own phone — **no install**.
+- Players join by **room code or QR** (`/join` or the QR on the host screen).
+- Host and phones stay in sync via lightweight **1s HTTP polling** (no WebSocket needed).
+- **Many rooms run in parallel** (keyed by code) and there is **no player cap** per room.
+- Sessions live in the server process: this works great on **one always-on instance**.
+  A redeploy/restart clears active rooms — moving the session store to Redis/Supabase
+  (planned) makes rooms survive restarts and enables serverless/multi-instance.
+
 ## Stack
 
 | Layer | Choice |
@@ -72,10 +101,24 @@ This writes:
 - `public/audio/soundclash-signal-vocals.mp3`
 - `public/audio/soundclash-signal-backing.mp3`
 
+## Deploy (Replit)
+
+Soundclash is a standard Next.js server — deploy it to a **single always-on instance**.
+
+- **Replit:** use a **Reserved VM** deployment — **not Autoscale** (sessions live in the
+  server process; Autoscale's multiple instances would break room sharing).
+- **Build:** `npm run build` · **Run:** `npm run start` (binds `0.0.0.0:$PORT`).
+- **Secrets:** `MXM_KEY` (required) + optional `ELEVENLABS_API_KEY` / voice ids.
+- Step-by-step: [`docs/DEPLOY_REPLIT.md`](./docs/DEPLOY_REPLIT.md).
+
+Once deployed you get a public HTTPS URL; the join QR/links resolve to it automatically,
+so judges/players can join from anywhere in the world.
+
 ## Documentation
 
 Start with [`docs/README.md`](./docs/README.md). The key docs are:
 
+- [`docs/DEPLOY_REPLIT.md`](./docs/DEPLOY_REPLIT.md) — how to publish (Replit Reserved VM).
 - [`docs/BRAND_SYSTEM.md`](./docs/BRAND_SYSTEM.md) — visual system and mood-board rules.
 - [`docs/PARTY_ROOM_PLAN.md`](./docs/PARTY_ROOM_PLAN.md) — current room flow and mini-game plan.
 - [`docs/API_INTEGRATION.md`](./docs/API_INTEGRATION.md) — provider wiring.
