@@ -6,20 +6,20 @@
   color-scheme: dark;
 }
 
-/* Soundclash — neon-on-black Y2K surface: deep ink with faint cassette-color glow. */
+/* Soundclash — warm editorial surface: deep warm ink with faint, soft accent washes. */
 body {
-  background-color: #0b0b0b;
+  background-color: #15120E;
   background-image:
-    radial-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1.6px),
-    radial-gradient(60% 50% at 12% -5%, rgba(255, 0, 127, 0.13), transparent 70%),
-    radial-gradient(55% 45% at 100% 8%, rgba(0, 229, 210, 0.1), transparent 70%),
-    radial-gradient(50% 40% at 50% 110%, rgba(255, 100, 2, 0.08), transparent 70%);
+    radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1.6px),
+    radial-gradient(60% 50% at 12% -5%, rgba(194, 86, 59, 0.08), transparent 70%),
+    radial-gradient(55% 45% at 100% 8%, rgba(46, 125, 107, 0.06), transparent 70%),
+    radial-gradient(50% 40% at 50% 110%, rgba(217, 154, 60, 0.05), transparent 70%);
   background-size: 22px 22px, 100% 100%, 100% 100%, 100% 100%;
   background-attachment: fixed;
 }
 
 ::selection {
-  background: rgba(255, 0, 127, 0.35);
+  background: rgba(194, 86, 59, 0.35);
   color: #fff;
 }
 
@@ -75,23 +75,23 @@ body {
 /* LED / 7-seg numerics for timers + scores. */
 .led {
   font-family: var(--font-mono), ui-monospace, monospace;
-  color: #00e5d2;
+  color: #D99A3C;
   text-shadow:
-    0 0 6px rgba(0, 229, 210, 0.7),
-    0 0 16px rgba(0, 229, 210, 0.35);
+    0 0 4px rgba(217, 154, 60, 0.45),
+    0 0 14px rgba(217, 154, 60, 0.2);
   letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
 }
 .led-danger {
-  color: #ff007f;
+  color: #C2563B;
   text-shadow:
-    0 0 6px rgba(255, 0, 127, 0.7),
-    0 0 16px rgba(255, 0, 127, 0.35);
+    0 0 4px rgba(194, 86, 59, 0.45),
+    0 0 14px rgba(194, 86, 59, 0.2);
 }
 
-/* Holographic chrome text accent. */
+/* Warm chrome text accent (ochre → terracotta). */
 .holo {
-  background-image: linear-gradient(100deg, #ff6402, #ff007f 45%, #00e5d2);
+  background-image: linear-gradient(100deg, #D99A3C, #C2563B 60%, #A2452E);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;

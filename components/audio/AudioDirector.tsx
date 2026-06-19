@@ -296,7 +296,7 @@ export default function AudioDirector() {
           onClick={() => void (enabled ? pauseAudio(true) : playAudio(true))}
           aria-label={enabled ? "Pause soundtrack" : "Play soundtrack"}
           title={enabled ? "Pause soundtrack" : "Play soundtrack"}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-3 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-black/80 text-white shadow-[0_12px_28px_-14px_rgba(0,0,0,0.9)] backdrop-blur transition-transform hover:-translate-y-0.5 hover:border-[#00e5d2]/70 active:translate-y-0 sm:right-5"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-3 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-black/80 text-white shadow-[0_12px_28px_-14px_rgba(0,0,0,0.9)] backdrop-blur transition-transform hover:-translate-y-0.5 hover:border-[#2E7D6B]/70 active:translate-y-0 sm:right-5"
         >
           <span className="sr-only">{track.title}</span>
           <Icon name={enabled ? "pause" : "play"} size={18} />

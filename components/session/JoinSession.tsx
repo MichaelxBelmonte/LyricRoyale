@@ -8,7 +8,7 @@ import JCard from "@/components/brand/JCard";
 import { PLAYER_AVATARS } from "@/lib/session/avatars";
 
 const FIELD =
-  "mt-2 h-12 w-full rounded-lg border border-black/15 bg-white px-3 text-[#0b0b0b] outline-none transition-colors placeholder:text-black/35 focus:border-[#ff007f] focus:shadow-[0_0_0_3px_rgba(255,0,127,0.15)]";
+  "mt-2 h-12 w-full rounded-lg border border-black/15 bg-white px-3 text-[#15120E] outline-none transition-colors placeholder:text-black/35 focus:border-[#C2563B] focus:shadow-[0_0_0_3px_rgba(194,86,59,0.15)]";
 
 export default function JoinSession() {
   const router = useRouter();
@@ -47,10 +47,10 @@ export default function JoinSession() {
       <HomeLogo />
       <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center px-4 py-12">
         <JCard spine="PLAYER · SIDE B" contentClassName="p-6 sm:p-7">
-          <p className="font-marker text-2xl" style={{ color: "#d80069" }}>
+          <p className="font-marker text-2xl" style={{ color: "#A2452E" }}>
             Controller
           </p>
-          <h1 className="mt-1 font-condensed text-3xl uppercase tracking-tight text-[#0b0b0b] sm:text-4xl">
+          <h1 className="mt-1 font-condensed text-3xl uppercase tracking-tight text-[#15120E] sm:text-4xl">
             Join a room
           </h1>
 
@@ -85,7 +85,7 @@ export default function JoinSession() {
             <span className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-black/45">
               Pick your avatar
             </span>
-            <div className="mt-2 grid grid-cols-6 gap-2">
+            <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-6">
               {PLAYER_AVATARS.map((emoji) => {
                 const selected = avatar === emoji;
                 return (
@@ -98,7 +98,7 @@ export default function JoinSession() {
                     className={[
                       "flex h-11 items-center justify-center rounded-lg border text-xl transition-colors",
                       selected
-                        ? "border-[#ff007f] bg-[#ff007f]/10 shadow-[0_0_0_3px_rgba(255,0,127,0.12)]"
+                        ? "border-[#C2563B] bg-[#C2563B]/10 shadow-[0_0_0_3px_rgba(194,86,59,0.12)]"
                         : "border-black/15 bg-white hover:border-black/40",
                     ].join(" ")}
                   >
@@ -109,7 +109,7 @@ export default function JoinSession() {
             </div>
           </div>
 
-          {error ? <p className="mt-4 text-sm font-semibold text-[#d80069]">{error}</p> : null}
+          {error ? <p className="mt-4 text-sm font-semibold text-[#A2452E]">{error}</p> : null}
 
           <Button onClick={join} disabled={loading || !code.trim()} full className="mt-6">
             {loading ? "Joining…" : "Join session ▶"}

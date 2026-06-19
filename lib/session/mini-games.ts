@@ -1,23 +1,43 @@
 import type { MiniGameId } from "@/lib/session/types";
 
+// Each game belongs to one category, which drives its card accent + line-art.
+export type MiniGameCategory = "lyrics" | "trivia" | "timing";
+
 export interface MiniGameMeta {
   id: MiniGameId;
   name: string;
   blurb: string;
+  category: MiniGameCategory;
+  /**
+   * Optional raster art for the host picker card. When set, the card shows this
+   * image instead of the built-in SVG line-art. Drop a PNG in public/games/ and
+   * point here (e.g. "/games/finish_line.png") — no other change needed.
+   */
+  image?: string;
 }
+
+/** Category → display label + brand accent tone, used by the host picker cards. */
+export const CATEGORY_META: Record<
+  MiniGameCategory,
+  { label: string; tone: "magenta" | "aqua" | "tangerine" }
+> = {
+  lyrics: { label: "Lyrics", tone: "magenta" },
+  trivia: { label: "Trivia", tone: "aqua" },
+  timing: { label: "Timing", tone: "tangerine" },
+};
 
 // Canonical catalog: single source of truth for rotation order AND the host
 // picker labels. Order here is the order the autopilot cycles through.
 export const MINI_GAME_CATALOG: MiniGameMeta[] = [
-  { id: "finish_line", name: "Finish the Line", blurb: "Tap the missing last word." },
-  { id: "mondegreen", name: "Misheard", blurb: "Spot the real lyric among the mondegreens." },
-  { id: "the_drop", name: "The Drop", blurb: "Hit the word as the lyric lands." },
-  { id: "on_beat", name: "On The Beat", blurb: "Lock the word right as the beat hits — timing scores." },
-  { id: "song_mash", name: "Who Said It", blurb: "Which track dropped this line?" },
-  { id: "next_line", name: "Next Line", blurb: "Pick the line that comes next." },
-  { id: "name_song", name: "Name That Song", blurb: "Match the lyric to its track." },
-  { id: "artist_pick", name: "Artist Lock", blurb: "Pick the artist behind the lyric." },
-  { id: "word_rush", name: "Word Rush", blurb: "Pick the recurring keyword." },
+  { id: "finish_line", name: "Finish the Line", blurb: "Tap the missing last word.", category: "lyrics" },
+  { id: "mondegreen", name: "Misheard", blurb: "Spot the real lyric among the mondegreens.", category: "lyrics" },
+  { id: "the_drop", name: "The Drop", blurb: "Hit the word as the lyric lands.", category: "timing" },
+  { id: "on_beat", name: "On The Beat", blurb: "Lock the word right as the beat hits — timing scores.", category: "timing" },
+  { id: "song_mash", name: "Who Said It", blurb: "Which track dropped this line?", category: "trivia" },
+  { id: "next_line", name: "Next Line", blurb: "Pick the line that comes next.", category: "lyrics" },
+  { id: "name_song", name: "Name That Song", blurb: "Match the lyric to its track.", category: "trivia" },
+  { id: "artist_pick", name: "Artist Lock", blurb: "Pick the artist behind the lyric.", category: "trivia" },
+  { id: "word_rush", name: "Word Rush", blurb: "Pick the recurring keyword.", category: "timing" },
 ];
 
 // Façade-only entries shown in the host gallery as "Coming soon". They are NOT

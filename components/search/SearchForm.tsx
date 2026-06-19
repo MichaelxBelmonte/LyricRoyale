@@ -39,7 +39,7 @@ export default function SearchForm({
           autoComplete="off"
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder={labels.searchPlaceholder}
-          className="h-12 w-full rounded-lg border border-black/15 bg-white pl-9 pr-3 text-base text-[#0b0b0b] outline-none transition-colors placeholder:text-black/35 focus:border-[#ff007f] focus:shadow-[0_0_0_3px_rgba(255,0,127,0.15)]"
+          className="h-12 w-full rounded-lg border border-black/15 bg-white pl-9 pr-3 text-base text-[#15120E] outline-none transition-colors placeholder:text-black/35 focus:border-[#C2563B] focus:shadow-[0_0_0_3px_rgba(194,86,59,0.15)]"
         />
       </div>
       <Button type="submit" disabled={loading}>

@@ -95,9 +95,9 @@ export default function HomeWaveform() {
       const barWidth = Math.max(3 * dpr, (width - gap * (bars - 1)) / bars);
       const mid = height * 0.52;
       const gradient = context.createLinearGradient(0, 0, width, 0);
-      gradient.addColorStop(0, "#ff6a00");
-      gradient.addColorStop(0.48, "#ff007f");
-      gradient.addColorStop(1, "#00e5d2");
+      gradient.addColorStop(0, "#D99A3C");
+      gradient.addColorStop(0.48, "#C2563B");
+      gradient.addColorStop(1, "#2E7D6B");
 
       context.fillStyle = gradient;
 
@@ -138,8 +138,8 @@ export default function HomeWaveform() {
         <canvas ref={canvasRef} className="h-24 w-full sm:h-28" aria-hidden="true" />
         <span
           className={[
-            "absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-black shadow-[0_5px_0_rgba(255,0,127,0.55)] transition-transform group-hover:-translate-y-[54%] group-active:-translate-y-[46%]",
-            state.enabled ? "border-[#00e5d2]/50 bg-[#00e5d2]" : "border-white/30 bg-[#fff1d6]",
+            "absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-black shadow-[0_5px_0_rgba(194,86,59,0.55)] transition-transform group-hover:-translate-y-[54%] group-active:-translate-y-[46%]",
+            state.enabled ? "border-[#2E7D6B]/50 bg-[#2E7D6B]" : "border-white/30 bg-[#F4ECD8]",
           ].join(" ")}
           aria-hidden
         >

@@ -23,10 +23,10 @@ export default function TeamSummary({
       <div className="flex items-center gap-3">
         <Avatar name={team.playerName} size="lg" />
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-[#d80069]">
+          <p className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-[#A2452E]">
             {labels.teamReady}
           </p>
-          <h2 className="truncate font-condensed text-lg uppercase tracking-tight text-[#0b0b0b]">
+          <h2 className="truncate font-condensed text-lg uppercase tracking-tight text-[#15120E]">
             {team.playerName}
           </h2>
           <p className="truncate text-xs text-black/45">{team.teamName}</p>
@@ -35,7 +35,7 @@ export default function TeamSummary({
           type="button"
           onClick={onEdit}
           aria-label={labels.editTeam}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-black/15 text-black/50 transition-colors hover:border-[#ff007f] hover:text-[#d80069]"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-black/15 text-black/50 transition-colors hover:border-[#C2563B] hover:text-[#A2452E]"
         >
           <Icon name="pencil" size={16} />
         </button>
@@ -56,7 +56,7 @@ export default function TeamSummary({
               className={[
                 "flex min-w-0 items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left text-sm font-medium transition-colors",
                 isActive
-                  ? "border-[#ff007f] bg-[#ff007f]/10 text-[#0b0b0b]"
+                  ? "border-[#C2563B] bg-[#C2563B]/10 text-[#15120E]"
                   : "border-black/12 bg-white text-black/70 hover:border-black/40 hover:text-black",
               ].join(" ")}
             >

@@ -42,9 +42,9 @@ export default function TopBar({
 
         <div className="flex items-center gap-2 sm:gap-3">
           {team ? (
-            <span className="hidden items-center gap-2 rounded-md border border-neutral-800 bg-neutral-925 py-1 pl-1 pr-2.5 text-xs font-medium text-neutral-200 sm:inline-flex">
+            <span className="inline-flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-925 py-1 pl-1 pr-1.5 text-xs font-medium text-neutral-200 sm:pr-2.5">
               <Avatar name={team.playerName} size="sm" />
-              <span className="max-w-[10rem] truncate">{team.playerName}</span>
+              <span className="hidden max-w-[10rem] truncate sm:inline">{team.playerName}</span>
             </span>
           ) : null}
           <LanguageToggle locale={locale} labels={languageLabels} onChange={onLocaleChange} />

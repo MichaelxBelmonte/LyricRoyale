@@ -49,7 +49,7 @@ export default function BrandIntro() {
 
   return (
     <div
-      className={`fixed inset-0 z-[60] flex flex-col items-center justify-center bg-[#0b0b0b] px-6 transition-opacity duration-500 ${
+      className={`fixed inset-0 z-[60] flex flex-col items-center justify-center bg-[#15120E] px-6 transition-opacity duration-500 ${
         leaving ? "pointer-events-none opacity-0" : "opacity-100"
       }`}
       role="dialog"
@@ -61,14 +61,14 @@ export default function BrandIntro() {
         playsInline
         preload="auto"
         onEnded={finish}
-        className={`absolute inset-0 h-full w-full bg-[#0b0b0b] object-contain ${
+        className={`absolute inset-0 h-full w-full bg-[#15120E] object-contain ${
           phase === "playing" ? "block" : "hidden"
         }`}
       />
 
       {phase === "splash" ? (
         <div className="relative z-10 flex animate-fade-up flex-col items-center text-center">
-          <Logo className="h-16 drop-shadow-[0_0_25px_rgba(255,0,127,0.3)] sm:h-24" />
+          <Logo className="h-16 drop-shadow-[0_0_25px_rgba(194,86,59,0.3)] sm:h-24" />
           <p className="mt-4 font-mono text-[0.7rem] uppercase tracking-[0.32em] text-neutral-400">
             Same track. Different challenge.
           </p>
@@ -83,7 +83,7 @@ export default function BrandIntro() {
           <button
             type="button"
             onClick={finish}
-            className="mt-5 text-xs font-medium uppercase tracking-[0.2em] text-neutral-500 transition-colors hover:text-neutral-300"
+            className="mt-4 inline-flex min-h-11 items-center px-4 text-xs font-medium uppercase tracking-[0.2em] text-neutral-500 transition-colors hover:text-neutral-300"
           >
             Skip intro
           </button>
@@ -92,7 +92,7 @@ export default function BrandIntro() {
         <button
           type="button"
           onClick={finish}
-          className="absolute right-4 top-4 z-20 flex h-10 items-center gap-2 rounded-full border border-white/20 bg-black/40 px-4 text-xs font-semibold uppercase tracking-[0.18em] text-white backdrop-blur transition-colors hover:bg-black/60"
+          className="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-20 flex h-11 items-center gap-2 rounded-full border border-white/20 bg-black/40 px-4 text-xs font-semibold uppercase tracking-[0.18em] text-white backdrop-blur transition-colors hover:bg-black/60"
         >
           Skip <span aria-hidden>▶▶</span>
         </button>

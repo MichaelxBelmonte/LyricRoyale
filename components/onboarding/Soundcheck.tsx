@@ -13,7 +13,7 @@ import type { SingerTeam } from "@/lib/types";
 const MAX_ARTISTS = 4;
 
 const FIELD =
-  "w-full rounded-lg border border-black/15 bg-white px-3 text-[#0b0b0b] outline-none transition-colors placeholder:text-black/35 focus:border-[#ff007f] focus:shadow-[0_0_0_3px_rgba(255,0,127,0.15)]";
+  "w-full rounded-lg border border-black/15 bg-white px-3 text-[#15120E] outline-none transition-colors placeholder:text-black/35 focus:border-[#C2563B] focus:shadow-[0_0_0_3px_rgba(194,86,59,0.15)]";
 
 interface SoundcheckProps {
   initialTeam?: SingerTeam | null;
@@ -74,7 +74,7 @@ export default function Soundcheck({ initialTeam, labels, onStart }: SoundcheckP
         <Sticker tone="tangerine" rotate={-4}>
           {labels.soundcheckEyebrow}
         </Sticker>
-        <h1 className="mt-4 font-condensed text-3xl uppercase tracking-tight text-[#0b0b0b] sm:text-4xl">
+        <h1 className="mt-4 font-condensed text-3xl uppercase tracking-tight text-[#15120E] sm:text-4xl">
           {labels.soundcheckTitle}
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-6 text-black/60">{labels.soundcheckBody}</p>
@@ -99,7 +99,7 @@ export default function Soundcheck({ initialTeam, labels, onStart }: SoundcheckP
             type="button"
             onClick={() => setIdentity(randomIdentity())}
             aria-label={labels.rerollIdentity}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-black/15 bg-white text-black/55 transition-colors hover:border-[#ff007f] hover:text-[#d80069]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-black/15 bg-white text-black/55 transition-colors hover:border-[#C2563B] hover:text-[#A2452E]"
           >
             <Icon name="refresh" size={18} />
           </button>
@@ -109,7 +109,7 @@ export default function Soundcheck({ initialTeam, labels, onStart }: SoundcheckP
       {/* Artists */}
       <section className="mt-4 rounded-xl border border-black/12 bg-white/60 p-4">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-condensed text-sm uppercase tracking-[0.16em] text-[#0b0b0b]">
+          <h2 className="font-condensed text-sm uppercase tracking-[0.16em] text-[#15120E]">
             {labels.pickArtistsTitle}
           </h2>
           <span className="font-mono text-xs tabular-nums text-black/45">
@@ -131,7 +131,7 @@ export default function Soundcheck({ initialTeam, labels, onStart }: SoundcheckP
                 className={[
                   "flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-sm font-medium transition-colors",
                   selected
-                    ? "border-[#ff007f] bg-[#ff007f]/10 text-[#0b0b0b]"
+                    ? "border-[#C2563B] bg-[#C2563B]/10 text-[#15120E]"
                     : full
                       ? "cursor-not-allowed border-black/10 bg-black/[0.03] text-black/30"
                       : "border-black/15 bg-white text-black/80 hover:border-black/40 hover:text-black",
@@ -139,7 +139,7 @@ export default function Soundcheck({ initialTeam, labels, onStart }: SoundcheckP
               >
                 <Avatar name={artist.name} size="sm" active={selected} />
                 <span className="min-w-0 flex-1 truncate">{artist.name}</span>
-                {selected ? <Icon name="check" size={15} className="text-[#d80069]" /> : null}
+                {selected ? <Icon name="check" size={15} className="text-[#A2452E]" /> : null}
               </button>
             );
           })}
@@ -182,7 +182,7 @@ export default function Soundcheck({ initialTeam, labels, onStart }: SoundcheckP
                   key={artist}
                   type="button"
                   onClick={() => toggleArtist(artist)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[#ff007f]/40 bg-[#ff007f]/10 px-2.5 py-1.5 text-sm font-medium text-[#d80069] transition-colors hover:border-[#ff007f]"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#C2563B]/40 bg-[#C2563B]/10 px-2.5 py-1.5 text-sm font-medium text-[#A2452E] transition-colors hover:border-[#C2563B]"
                 >
                   {artist}
                   <Icon name="x" size={14} />

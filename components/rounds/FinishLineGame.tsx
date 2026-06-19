@@ -186,7 +186,7 @@ export default function FinishLineGame({
   const primaryAction = isEncore ? labels.viewResult : labels.nextRound;
 
   return (
-    <section className="tx-grain tx-grain-dark relative animate-pop-in overflow-hidden rounded-2xl border border-white/10 bg-[#0e0e10] p-4 shadow-[0_20px_60px_-24px_rgba(255,0,127,0.35)] sm:p-6">
+    <section className="tx-grain tx-grain-dark relative animate-pop-in overflow-hidden rounded-2xl border border-white/10 bg-[#0e0e10] p-4 shadow-[0_20px_60px_-24px_rgba(194,86,59,0.35)] sm:p-6">
       {round.tracking.pixel ? (
         <img alt="" className="hidden" referrerPolicy="no-referrer" src={round.tracking.pixel} />
       ) : null}
@@ -194,7 +194,7 @@ export default function FinishLineGame({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#ff007f]/40 bg-[#ff007f]/10 px-3 py-1 font-mono text-[0.65rem] uppercase tracking-[0.2em] text-[#ff8cc0]">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#C2563B]/40 bg-[#C2563B]/10 px-3 py-1 font-mono text-[0.65rem] uppercase tracking-[0.2em] text-[#E0967F]">
               ◉ {labels.roundTitle}
             </span>
             {isEncore ? (
@@ -253,7 +253,7 @@ export default function FinishLineGame({
         <div className="flex items-center justify-between gap-3">
           <span
             className={`font-mono text-xs font-medium uppercase tracking-[0.15em] ${
-              timeDanger && !result ? "text-[#ff8cc0]" : "text-neutral-500"
+              timeDanger && !result ? "text-[#E0967F]" : "text-neutral-500"
             }`}
           >
             {labels.timeRemainingLabel}
@@ -265,8 +265,8 @@ export default function FinishLineGame({
             className={[
               "h-full rounded-full transition-[width] duration-100",
               timeDanger && !result
-                ? "animate-blank-pulse bg-[#ff007f]"
-                : "bg-gradient-to-r from-[#00e5d2] to-[#2ceadb]",
+                ? "animate-blank-pulse bg-[#C2563B]"
+                : "bg-gradient-to-r from-[#2E7D6B] to-[#4DA395]",
             ].join(" ")}
             style={{ width: `${remainingRatio * 100}%` }}
           />
@@ -289,9 +289,9 @@ export default function FinishLineGame({
               result ? "animate-slam-in" : "animate-blank-pulse",
               result
                 ? result.correct
-                  ? "border-[#00b8a8] bg-white text-[#00b8a8]"
-                  : "border-[#ff007f] bg-white text-[#d80069]"
-                : "border-dashed border-[#ff007f] bg-white/70 text-[#d80069]",
+                  ? "border-[#246253] bg-white text-[#246253]"
+                  : "border-[#C2563B] bg-white text-[#A2452E]"
+                : "border-dashed border-[#C2563B] bg-white/70 text-[#A2452E]",
             ].join(" ")}
           >
             {result ? result.answer : "_____"}
@@ -309,7 +309,7 @@ export default function FinishLineGame({
           disabled={result !== null || pending}
           autoComplete="off"
           placeholder={labels.answerPlaceholder}
-          className="h-12 rounded-lg border border-neutral-800 bg-neutral-950 px-4 text-base text-white outline-none transition-all placeholder:text-neutral-600 focus:border-[#ff007f] focus:shadow-[0_0_0_3px_rgba(255,0,127,0.2)] disabled:opacity-70"
+          className="h-12 rounded-lg border border-neutral-800 bg-neutral-950 px-4 text-base text-white outline-none transition-all placeholder:text-neutral-600 focus:border-[#C2563B] focus:shadow-[0_0_0_3px_rgba(194,86,59,0.2)] disabled:opacity-70"
         />
         <Button type="submit" disabled={result !== null || pending}>
           {labels.submitAnswer}
@@ -410,7 +410,7 @@ function KaraokeTokens({ drop }: { drop: FinishLineDrop }) {
           className={[
             "transition-colors duration-150",
             index === activeIndex
-              ? "text-[#d80069]"
+              ? "text-[#A2452E]"
               : index < activeIndex
                 ? "text-[#14110f]"
                 : "text-[#14110f]/35",
@@ -447,7 +447,7 @@ function HeatMeter({
         broken
           ? "animate-flash-out border-neutral-800 bg-neutral-950"
           : hot
-            ? "border-[#ff007f]/60 bg-[#ff007f]/5"
+            ? "border-[#C2563B]/60 bg-[#C2563B]/5"
             : "border-neutral-850 bg-neutral-950",
       ].join(" ")}
     >
@@ -457,14 +457,14 @@ function HeatMeter({
         </p>
         <div className="flex items-center gap-2">
           {hot && !broken ? (
-            <span className="rounded-full bg-[#ff007f] px-2 py-0.5 text-[0.55rem] font-bold uppercase tracking-[0.12em] text-white">
+            <span className="rounded-full bg-[#C2563B] px-2 py-0.5 text-[0.55rem] font-bold uppercase tracking-[0.12em] text-white">
               On fire
             </span>
           ) : null}
           <span
             className={[
               "font-mono text-2xl tabular-nums",
-              broken ? "text-neutral-600" : hot ? "text-[#ff8cc0]" : "text-white",
+              broken ? "text-neutral-600" : hot ? "text-[#E0967F]" : "text-white",
             ].join(" ")}
           >
             ×{formatMultiplier(multiplier)}
@@ -473,7 +473,7 @@ function HeatMeter({
       </div>
       <div className="mt-2 h-3 overflow-hidden rounded-full border border-black/40 bg-neutral-900">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-[#00e5d2] via-[#ff8330] to-[#ff007f] transition-[width] duration-300"
+          className="h-full rounded-full bg-gradient-to-r from-[#2E7D6B] via-[#E2A85C] to-[#C2563B] transition-[width] duration-300"
           style={{ width: `${segments === 0 ? 0 : Math.max(8, (segments / MAX_HEAT) * 100)}%` }}
         />
       </div>
@@ -493,12 +493,12 @@ function HostBubble({ result }: { result: RoundResult | null }) {
       : "Ooh, not even close — shake it off."
     : "Lock in and finish the line!";
   return (
-    <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#00e5d2]/30 bg-[#00e5d2]/[0.06] px-3 py-2.5">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#ff6402] to-[#ff007f] text-sm shadow-[0_4px_14px_-4px_rgba(255,0,127,0.7)]">
+    <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#2E7D6B]/30 bg-[#2E7D6B]/[0.06] px-3 py-2.5">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#D99A3C] to-[#C2563B] text-sm shadow-[0_4px_14px_-4px_rgba(194,86,59,0.7)]">
         🎙️
       </span>
       <p className="min-w-0">
-        <span className="block font-mono text-[0.55rem] uppercase tracking-[0.22em] text-[#7df2e8]">
+        <span className="block font-mono text-[0.55rem] uppercase tracking-[0.22em] text-[#86BDB0]">
           AI Host · Beatbot
         </span>
         <span className="mt-0.5 block truncate text-sm text-neutral-200">{line}</span>

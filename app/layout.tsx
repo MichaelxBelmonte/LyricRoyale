@@ -70,7 +70,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0b0b",
+  themeColor: "#15120E",
   width: "device-width",
   initialScale: 1,
   // Draw under the notch/home-indicator so env(safe-area-inset-*) becomes active.
@@ -83,7 +83,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="en"
       className={`${sans.variable} ${mono.variable} ${condensed.variable} ${marker.variable}`}
     >
-      <body className="min-h-[100dvh] bg-[#0b0b0b] font-sans text-neutral-100 antialiased">
+      <body className="min-h-[100dvh] bg-[#15120E] font-sans text-neutral-100 antialiased">
         {children}
         <AudioDirector />
       </body>

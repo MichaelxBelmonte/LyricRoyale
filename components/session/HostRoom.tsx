@@ -7,15 +7,23 @@ import Logo from "@/components/brand/Logo";
 import Sticker from "@/components/brand/Sticker";
 import AudioConsole from "@/components/session/AudioConsole";
 import JoinQr from "@/components/session/JoinQr";
+import MiniGameArt from "@/components/session/MiniGameArt";
+import { MusixmatchTracking } from "@/components/session/MusixmatchTracking";
 import SearchForm from "@/components/search/SearchForm";
 import TrackResults from "@/components/search/TrackResults";
 import Avatar from "@/components/ui/Avatar";
 import Icon from "@/components/ui/Icon";
 import { CURATED_ARTISTS } from "@/lib/game/artists";
 import { buildRoastLine, finalLine, roundIntroLine, welcomeLine } from "@/lib/game/host-banter";
-import { COMING_SOON_GAMES, MINI_GAME_CATALOG } from "@/lib/session/mini-games";
+import {
+  ALL_MINI_GAME_IDS,
+  CATEGORY_META,
+  COMING_SOON_GAMES,
+  MINI_GAME_CATALOG,
+  orderMiniGames,
+} from "@/lib/session/mini-games";
 import type { HostVoicePreset, MiniGameId, PublicSessionState } from "@/lib/session/types";
-import type { ErrorResponse, FinishLineDrop, SearchResponse, TrackSummary, TrackingLinks } from "@/lib/types";
+import type { ErrorResponse, FinishLineDrop, SearchResponse, TrackSummary } from "@/lib/types";
 
 const AUTOPILOT_ROUNDS = 6;
 const AUTO_SEED_QUERY = "queen";
@@ -26,6 +34,38 @@ const SETUP_STEPS = [
   { id: "lobby" as const, label: "Lobby" },
 ];
 type SetupStep = (typeof SETUP_STEPS)[number]["id"];
+
+// A balanced one-tap starter: one game per category.
+const QUICK_SET: MiniGameId[] = ["finish_line", "the_drop", "song_mash"];
+
+// Card styling per category tone — accent line color, banner wash, selected ring,
+// category tag, and the check badge. Keeps the JSX tidy and on-brand.
+const TONE_STYLES: Record<
+  "magenta" | "aqua" | "tangerine",
+  { line: string; grad: string; selected: string; tag: string; check: string }
+> = {
+  magenta: {
+    line: "text-brand-400",
+    grad: "linear-gradient(135deg, rgba(194,86,59,0.30), rgba(194,86,59,0.06) 55%, rgba(194,86,59,0) 82%)",
+    selected: "border-brand ring-2 ring-brand/40",
+    tag: "border-brand/40 bg-brand/10 text-brand-300",
+    check: "bg-brand text-white",
+  },
+  aqua: {
+    line: "text-aqua-400",
+    grad: "linear-gradient(135deg, rgba(46,125,107,0.28), rgba(46,125,107,0.06) 55%, rgba(46,125,107,0) 82%)",
+    selected: "border-aqua ring-2 ring-aqua/40",
+    tag: "border-aqua/40 bg-aqua/10 text-aqua-300",
+    check: "bg-aqua text-ink",
+  },
+  tangerine: {
+    line: "text-tangerine-400",
+    grad: "linear-gradient(135deg, rgba(217,154,60,0.28), rgba(217,154,60,0.06) 55%, rgba(217,154,60,0) 82%)",
+    selected: "border-tangerine ring-2 ring-tangerine/40",
+    tag: "border-tangerine/40 bg-tangerine/10 text-tangerine-300",
+    check: "bg-tangerine text-ink",
+  },
+};
 
 const searchLabels = {
   searchLabel: "Song search",
@@ -45,27 +85,6 @@ const resultLabels = {
   lyricsBadge: "lyrics",
 };
 
-function MusixmatchTracking({ roundKey, tracking }: { roundKey?: string; tracking?: TrackingLinks }) {
-  useEffect(() => {
-    if (!roundKey || !tracking?.pixel) return;
-    const pixel = new Image();
-    pixel.referrerPolicy = "no-referrer";
-    pixel.src = tracking.pixel;
-  }, [roundKey, tracking?.pixel]);
-
-  useEffect(() => {
-    if (!roundKey || !tracking?.script) return;
-    const script = document.createElement("script");
-    script.src = tracking.script;
-    script.async = true;
-    script.referrerPolicy = "no-referrer";
-    document.body.appendChild(script);
-    return () => script.remove();
-  }, [roundKey, tracking?.script]);
-
-  return null;
-}
-
 export default function HostRoom({ code }: { code: string }) {
   const [session, setSession] = useState<PublicSessionState | null>(null);
   const [query, setQuery] = useState("");
@@ -78,6 +97,7 @@ export default function HostRoom({ code }: { code: string }) {
   const [speaking, setSpeaking] = useState(false);
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [setupStep, setSetupStep] = useState<SetupStep>("games");
+  const [showSoon, setShowSoon] = useState(false);
   const [deck, setDeck] = useState<TrackSummary[]>([]);
   const [hostVolume, setHostVolume] = useState(1);
   const [hostMuted, setHostMuted] = useState(false);
@@ -115,6 +135,16 @@ export default function HostRoom({ code }: { code: string }) {
     }, 1200);
     return () => window.clearInterval(timer);
   }, [loadSession]);
+
+  // Stop the host voice when leaving the room — otherwise queued/playing lines
+  // keep talking after you navigate away or close the show.
+  useEffect(() => {
+    return () => {
+      teardownSpeech();
+      window.dispatchEvent(new CustomEvent("soundclash:duck", { detail: { active: false } }));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function searchFor(value: string) {
     const cleaned = value.trim();
@@ -166,7 +196,7 @@ export default function HostRoom({ code }: { code: string }) {
       const payload = (await response.json()) as { session?: PublicSessionState; error?: string };
       if (!response.ok || !payload.session) throw new Error(payload.error ?? "Could not start show");
       setSession(payload.session);
-      void speakHost(roundIntroLine(payload.session.currentRound?.title ?? "Lyric game", 0, payload.session.locale));
+      speakNow(roundIntroLine(payload.session.currentRound?.title ?? "Lyric game", 0, payload.session.locale));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start show");
     } finally {
@@ -214,6 +244,12 @@ export default function HostRoom({ code }: { code: string }) {
     if (payload.session) setSession(payload.session);
   }
 
+  // Leaving a live round back to the lobby must also silence the host.
+  function goToLobby() {
+    stopSpeaking();
+    void patchSession("lobby");
+  }
+
   async function configureGames(next: MiniGameId[]) {
     if (next.length === 0) return;
     try {
@@ -256,7 +292,7 @@ export default function HostRoom({ code }: { code: string }) {
     const payload = (await response.json()) as { session?: PublicSessionState };
     if (payload.session) {
       setSession(payload.session);
-      void speakHost(
+      speakNow(
         roundIntroLine(
           payload.session.currentRound?.title ?? "Lyric game",
           payload.session.currentRound?.index ?? 0,
@@ -385,8 +421,10 @@ export default function HostRoom({ code }: { code: string }) {
     if (!speakingRef.current) void playNextSpeech();
   }
 
-  function stopSpeaking() {
-    speechGenRef.current += 1;
+  // Stop everything currently in the audio pipeline without un-ducking logic
+  // running through finishSpeech. Shared by stop, round changes and unmount.
+  function teardownSpeech() {
+    speechGenRef.current += 1; // cancels any in-flight fetch/playback
     speechQueue.current = [];
     const audio = currentAudioRef.current;
     if (audio) {
@@ -394,7 +432,27 @@ export default function HostRoom({ code }: { code: string }) {
       audio.onerror = null;
       audio.pause();
     }
-    finishSpeech();
+    if (currentUrlRef.current) URL.revokeObjectURL(currentUrlRef.current);
+    currentUrlRef.current = null;
+    currentAudioRef.current = null;
+    speakingRef.current = false;
+  }
+
+  // Interrupt whatever is playing and speak this line immediately — used on round
+  // changes so the host never talks over the start of the next round.
+  function speakNow(text: string, presetOverride?: HostVoicePreset) {
+    const clean = text.trim();
+    if (!clean) return;
+    teardownSpeech();
+    setSpeaking(false);
+    speechQueue.current = [{ text: clean, preset: presetOverride }];
+    void playNextSpeech();
+  }
+
+  function stopSpeaking() {
+    teardownSpeech();
+    setSpeaking(false);
+    window.dispatchEvent(new CustomEvent("soundclash:duck", { detail: { active: false } }));
   }
 
   function speakIntro() {
@@ -428,8 +486,8 @@ export default function HostRoom({ code }: { code: string }) {
   }
 
   return (
-    <main className="mx-auto min-h-[100dvh] w-full max-w-7xl px-4 py-6 sm:px-6">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-850 pb-5">
+    <main className="mx-auto flex min-h-[100dvh] w-full max-w-7xl flex-col px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-850 pb-5 lg:shrink-0">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.25em] text-brand">Host screen</p>
           <h1 className="mt-2">
@@ -458,7 +516,7 @@ export default function HostRoom({ code }: { code: string }) {
       </header>
       {speechError ? <p className="mt-3 text-xs text-brand-300">{speechError}</p> : null}
 
-      <div className="mt-4">
+      <div className="mt-4 lg:shrink-0">
         <AudioConsole
           hostVolume={hostVolume}
           hostMuted={hostMuted}
@@ -497,7 +555,7 @@ export default function HostRoom({ code }: { code: string }) {
               session={session}
               onReveal={() => void patchSession("reveal")}
               onNext={() => void startNextAutoRound()}
-              onLobby={() => void patchSession("lobby")}
+              onLobby={goToLobby}
             />
           </section>
         </div>
@@ -516,7 +574,7 @@ export default function HostRoom({ code }: { code: string }) {
                   disabled={!reachable}
                   onClick={() => reachable && setSetupStep(step.id)}
                   className={[
-                    "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 transition-colors",
+                    "inline-flex items-center gap-2 rounded-full border px-3.5 py-2.5 transition-colors",
                     isCurrent
                       ? "border-brand bg-brand/10 text-brand-300"
                       : done
@@ -524,17 +582,17 @@ export default function HostRoom({ code }: { code: string }) {
                         : "cursor-not-allowed border-neutral-850 text-neutral-600",
                   ].join(" ")}
                 >
-                  <span className="grid h-5 w-5 place-items-center rounded-full border border-current font-mono text-[0.6rem]">
+                  <span className="grid h-6 w-6 place-items-center rounded-full border border-current font-mono text-[0.65rem]">
                     {done ? "✓" : index + 1}
                   </span>
-                  <span className="font-condensed text-xs uppercase tracking-[0.08em]">{step.label}</span>
+                  <span className="font-condensed text-sm uppercase tracking-[0.08em]">{step.label}</span>
                 </button>
               );
             })}
           </div>
 
           {setupStep === "games" && session ? (
-            <section className="mt-5 rounded-2xl border border-neutral-850 bg-neutral-925 p-4 sm:p-6">
+            <section className="mt-5 lg:mt-6">
               <div className="flex flex-wrap items-center gap-3">
                 <Sticker tone="aqua" rotate={-4}>
                   Step 1
@@ -543,85 +601,163 @@ export default function HostRoom({ code }: { code: string }) {
                   <p className="font-condensed text-xl uppercase leading-tight tracking-[0.02em] text-white">
                     Choose mini-games
                   </p>
-                  <p className="text-xs text-neutral-500">Tap to include rounds — pick one for a single-game show.</p>
+                  <p className="text-xs text-neutral-500">Tap a card to add it to the rotation. Keep at least one.</p>
                 </div>
-                <span className="ml-auto rounded-full border border-brand/40 bg-brand/10 px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-[0.16em] text-brand-300">
-                  {session.miniGames.length} on
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void configureGames(ALL_MINI_GAME_IDS)}
+                  className="rounded-full border border-neutral-800 px-3 py-2 font-mono text-[0.6rem] uppercase tracking-[0.16em] text-neutral-300 transition-colors hover:border-aqua hover:text-aqua-300"
+                >
+                  All 9
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void configureGames(orderMiniGames(QUICK_SET))}
+                  className="rounded-full border border-neutral-800 px-3 py-2 font-mono text-[0.6rem] uppercase tracking-[0.16em] text-neutral-300 transition-colors hover:border-aqua hover:text-aqua-300"
+                >
+                  Quick 3
+                </button>
+                <span className="ml-auto rounded-full border border-brand/40 bg-brand/10 px-2.5 py-1.5 font-mono text-[0.6rem] uppercase tracking-[0.16em] text-brand-300">
+                  {session.miniGames.length} of {MINI_GAME_CATALOG.length} on
                 </span>
               </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {MINI_GAME_CATALOG.map((game) => {
-                    const selected = session.miniGames.includes(game.id);
-                    const isLast = selected && session.miniGames.length === 1;
-                    return (
-                      <button
-                        key={game.id}
-                        type="button"
-                        disabled={isLast}
-                        onClick={() =>
-                          void configureGames(
-                            selected
-                              ? session.miniGames.filter((id) => id !== game.id)
-                              : [...session.miniGames, game.id],
-                          )
-                        }
-                        aria-pressed={selected}
-                        className={[
-                          "rounded-lg border px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed",
-                          selected
-                            ? "border-brand bg-brand/10"
-                            : "border-neutral-850 bg-neutral-950 hover:border-neutral-700",
-                        ].join(" ")}
-                      >
-                        <span className="flex items-center justify-between gap-2">
-                          <span
-                            className={[
-                              "font-condensed text-sm uppercase tracking-[0.03em]",
-                              selected ? "text-brand-300" : "text-white",
-                            ].join(" ")}
-                          >
-                            {game.name}
-                          </span>
-                          <span
-                            aria-hidden
-                            className={[
-                              "grid h-4 w-4 shrink-0 place-items-center rounded-[4px] border text-[10px] leading-none",
-                              selected ? "border-brand bg-brand text-white" : "border-neutral-700 text-transparent",
-                            ].join(" ")}
-                          >
-                            ✓
-                          </span>
-                        </span>
-                        <span className="mt-0.5 block text-xs leading-4 text-neutral-500">{game.blurb}</span>
-                      </button>
-                    );
-                  })}
-                  {COMING_SOON_GAMES.map((game) => (
-                    <div
+
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                {MINI_GAME_CATALOG.map((game) => {
+                  const selected = session.miniGames.includes(game.id);
+                  const isLast = selected && session.miniGames.length === 1;
+                  const cat = CATEGORY_META[game.category];
+                  const tone = TONE_STYLES[cat.tone];
+                  return (
+                    <button
                       key={game.id}
-                      aria-disabled
-                      className="rounded-lg border border-dashed border-neutral-850 bg-neutral-950/50 px-3 py-2.5 opacity-60"
+                      type="button"
+                      disabled={isLast}
+                      onClick={() =>
+                        void configureGames(
+                          selected
+                            ? session.miniGames.filter((id) => id !== game.id)
+                            : [...session.miniGames, game.id],
+                        )
+                      }
+                      aria-pressed={selected}
+                      title={isLast ? "Keep at least one game in the rotation" : undefined}
+                      className={[
+                        "group relative flex flex-col overflow-hidden rounded-xl border text-left transition-all disabled:cursor-not-allowed",
+                        selected ? tone.selected : "border-neutral-850 hover:border-neutral-700",
+                      ].join(" ")}
                     >
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="font-condensed text-sm uppercase tracking-[0.03em] text-neutral-400">
+                      <div
+                        className="relative h-16 w-full overflow-hidden bg-neutral-950 sm:h-20"
+                        style={{ backgroundImage: tone.grad }}
+                      >
+                        {game.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={game.image} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <MiniGameArt
+                            id={game.id}
+                            className={[
+                              "h-full w-full px-3 py-2 transition-opacity",
+                              tone.line,
+                              selected ? "opacity-100" : "opacity-70 group-hover:opacity-100",
+                            ].join(" ")}
+                          />
+                        )}
+                        <span
+                          className={[
+                            "absolute left-2 top-2 rounded-full border px-2 py-0.5 font-mono text-[0.5rem] uppercase tracking-[0.16em]",
+                            tone.tag,
+                          ].join(" ")}
+                        >
+                          {cat.label}
+                        </span>
+                        {selected ? (
+                          <span
+                            className={[
+                              "absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full",
+                              tone.check,
+                            ].join(" ")}
+                          >
+                            <Icon name="check" size={12} />
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="flex flex-1 flex-col gap-0.5 p-2.5">
+                        <span
+                          className={[
+                            "font-condensed text-sm uppercase leading-tight tracking-[0.03em]",
+                            selected ? "text-white" : "text-neutral-200",
+                          ].join(" ")}
+                        >
                           {game.name}
                         </span>
-                        <span className="rounded-full border border-neutral-700 px-2 py-0.5 font-mono text-[0.5rem] uppercase tracking-[0.15em] text-neutral-500">
-                          Soon
-                        </span>
-                      </span>
-                      <span className="mt-0.5 block text-xs leading-4 text-neutral-600">{game.blurb}</span>
-                    </div>
-                  ))}
+                        <span className="line-clamp-1 text-[0.7rem] leading-tight text-neutral-500">{game.blurb}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowSoon((value) => !value)}
+                  aria-expanded={showSoon}
+                  className="flex w-full items-center justify-between rounded-lg border border-dashed border-neutral-850 px-3 py-3 text-left transition-colors hover:border-neutral-700"
+                >
+                  <span className="font-mono text-[0.62rem] uppercase tracking-[0.18em] text-neutral-500">
+                    Coming soon · {COMING_SOON_GAMES.length}
+                  </span>
+                  <Icon
+                    name="chevronLeft"
+                    size={14}
+                    className={["text-neutral-500 transition-transform", showSoon ? "rotate-90" : "-rotate-90"].join(" ")}
+                  />
+                </button>
+                {showSoon ? (
+                  <div className="mt-2.5 grid grid-cols-2 gap-2.5 lg:grid-cols-3">
+                    {COMING_SOON_GAMES.map((game) => (
+                      <div
+                        key={game.id}
+                        aria-disabled
+                        className="rounded-xl border border-dashed border-neutral-850 bg-neutral-950/40 p-3 opacity-70"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-condensed text-sm uppercase tracking-[0.03em] text-neutral-400">
+                            {game.name}
+                          </span>
+                          <span className="rounded-full border border-neutral-700 px-2 py-0.5 font-mono text-[0.5rem] uppercase tracking-[0.15em] text-neutral-500">
+                            Soon
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[0.7rem] leading-tight text-neutral-600">{game.blurb}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div
+                className="sticky bottom-0 z-10 -mx-4 mt-4 flex items-center justify-between gap-3 border-t border-neutral-850 bg-ink/85 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 lg:backdrop-blur-none"
+                style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+              >
+                <div className="min-w-0">
+                  <p className="font-mono text-[0.58rem] uppercase tracking-[0.16em] text-neutral-500">In rotation</p>
+                  <p className="font-condensed text-base uppercase leading-none tracking-[0.04em] text-white">
+                    {session.miniGames.length} {session.miniGames.length === 1 ? "game" : "games"}
+                  </p>
                 </div>
-              <div className="mt-6 flex justify-end">
                 <Button onClick={() => setSetupStep("artists")}>Next · Artists →</Button>
               </div>
             </section>
           ) : null}
 
           {setupStep === "artists" ? (
-            <section className="mt-5 rounded-2xl border border-neutral-850 bg-neutral-925 p-4 sm:p-6">
+            <section className="mt-5 lg:mt-6">
               <div className="flex flex-wrap items-center gap-3">
                 <Sticker tone="magenta" rotate={-4}>
                   Step 2
@@ -700,11 +836,12 @@ export default function HostRoom({ code }: { code: string }) {
                   labels={resultLabels}
                   onPlay={toggleDeck}
                   variant="select"
+                  dense
                   selectedIds={deck.map((track) => track.trackId)}
                 />
               </div>
 
-              <div className="mt-5 flex items-center gap-3">
+              <div className="mt-4 flex items-center gap-3">
                 <span className="h-px flex-1 bg-neutral-850" />
                 <span className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-neutral-600">or</span>
                 <span className="h-px flex-1 bg-neutral-850" />
@@ -713,13 +850,13 @@ export default function HostRoom({ code }: { code: string }) {
                 type="button"
                 onClick={() => void autoFillDeck()}
                 disabled={loadingSearch}
-                className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-tangerine/40 bg-tangerine/10 font-condensed text-sm uppercase tracking-[0.06em] text-tangerine-300 transition-colors hover:bg-tangerine/20 disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-tangerine/40 bg-tangerine/10 font-condensed text-sm uppercase tracking-[0.06em] text-tangerine-300 transition-colors hover:bg-tangerine/20 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Icon name="shuffle" size={16} />
                 {loadingSearch ? "Loading…" : "Surprise me — auto-fill the setlist"}
               </button>
 
-              <div className="mt-6 flex items-center justify-between gap-3">
+              <div className="mt-5 flex items-center justify-between gap-3">
                 <Button variant="outlineLight" onClick={() => setSetupStep("games")}>
                   ← Back
                 </Button>
@@ -731,7 +868,7 @@ export default function HostRoom({ code }: { code: string }) {
           ) : null}
 
           {setupStep === "lobby" ? (
-            <div className="mt-5 space-y-5">
+            <div className="mt-5 space-y-5 lg:mt-6">
               <section className="grid grid-cols-1 gap-5 rounded-2xl border border-aqua/20 bg-neutral-925 p-5 sm:grid-cols-[auto_1fr] sm:items-center sm:p-6">
                 <JoinQr url={joinUrl} size={150} className="shrink-0 justify-self-center sm:justify-self-start" />
                 <div className="min-w-0">

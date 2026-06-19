@@ -29,7 +29,7 @@ export default function DuelResult({
         <Sticker tone={head.won && !tie ? "aqua" : "magenta"} rotate={-3}>
           {labels.challengeBannerTitle}
         </Sticker>
-        <h2 className="mt-4 font-condensed text-4xl uppercase tracking-tight text-[#0b0b0b]">{title}</h2>
+        <h2 className="mt-4 font-condensed text-4xl uppercase tracking-tight text-[#15120E]">{title}</h2>
         {!tie ? (
           <p className="mt-1 font-mono text-sm tabular-nums text-black/55">
             {labels.duelMarginBy} {head.margin} {labels.pointsLabel}
@@ -46,18 +46,18 @@ export default function DuelResult({
             <p className="truncate font-mono text-[0.6rem] uppercase tracking-[0.18em] text-black/45">
               {labels.youLabel} · {youName}
             </p>
-            <p className="mt-1 font-mono text-2xl tabular-nums text-[#0b0b0b]">{head.myTotal}</p>
+            <p className="mt-1 font-mono text-2xl tabular-nums text-[#15120E]">{head.myTotal}</p>
           </div>
           <div
             className={[
               "rounded-lg border px-3 py-2",
-              !head.won && !tie ? "border-[#ff007f]/40 bg-[#ff007f]/5" : "border-black/10 bg-white/60",
+              !head.won && !tie ? "border-[#C2563B]/40 bg-[#C2563B]/5" : "border-black/10 bg-white/60",
             ].join(" ")}
           >
             <p className="truncate font-mono text-[0.6rem] uppercase tracking-[0.18em] text-black/45">
               {rivalName}
             </p>
-            <p className="mt-1 font-mono text-2xl tabular-nums text-[#0b0b0b]">{head.theirTotal}</p>
+            <p className="mt-1 font-mono text-2xl tabular-nums text-[#15120E]">{head.theirTotal}</p>
           </div>
         </div>
 
@@ -74,7 +74,7 @@ export default function DuelResult({
                 line.outcome === "win"
                   ? "border-[#0a7d55]/40 bg-[#0a7d55]/10 text-[#0a7d55]"
                   : line.outcome === "loss"
-                    ? "border-[#ff007f]/40 bg-[#ff007f]/10 text-[#d80069]"
+                    ? "border-[#C2563B]/40 bg-[#C2563B]/10 text-[#A2452E]"
                     : "border-black/15 text-black/40",
               ].join(" ")}
             >

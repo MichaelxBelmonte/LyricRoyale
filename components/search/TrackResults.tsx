@@ -19,6 +19,8 @@ interface TrackResultsProps {
   variant?: "play" | "select";
   /** Track ids currently in the setlist (select variant only). */
   selectedIds?: number[];
+  /** Compact multi-column grid of smaller rows (host setlist) instead of a single list. */
+  dense?: boolean;
 }
 
 export default function TrackResults({
@@ -29,6 +31,7 @@ export default function TrackResults({
   onPlay,
   variant = "play",
   selectedIds = [],
+  dense = false,
 }: TrackResultsProps) {
   const isSelect = variant === "select";
   if (!searched) {
@@ -47,7 +50,7 @@ export default function TrackResults({
       >
         {labels.resultsTitle}
       </h2>
-      <ul className="space-y-2">
+      <ul className={dense ? "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "space-y-2"}>
         {results.map((track, index) => {
           const selected = isSelect && selectedIds.includes(track.trackId);
           return (
@@ -55,26 +58,30 @@ export default function TrackResults({
             key={track.trackId}
             style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
             className={[
-              "group grid grid-cols-1 animate-fade-up gap-3 rounded-xl border bg-white p-3.5 transition-colors sm:grid-cols-[1fr_auto] sm:items-center",
-              selected ? "border-[#ff007f]" : "border-black/10 hover:border-[#ff007f]/40",
+              "group grid animate-fade-up rounded-xl border bg-white transition-colors",
+              dense
+                ? "grid-cols-[1fr_auto] items-center gap-2 p-2.5"
+                : "grid-cols-1 gap-3 p-3.5 sm:grid-cols-[1fr_auto] sm:items-center",
+              selected ? "border-[#C2563B]" : "border-black/10 hover:border-[#C2563B]/40",
             ].join(" ")}
           >
             <div className="min-w-0">
-              <p className="truncate font-semibold text-[#0b0b0b]">{track.trackName}</p>
+              <p className="truncate font-semibold text-[#15120E]">{track.trackName}</p>
               <p className="truncate text-sm text-black/50">{track.artistName}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              {track.hasRichsync ? <Badge tone="brand">{labels.richsyncBadge}</Badge> : null}
-              {track.hasLyrics ? <Badge>{labels.lyricsBadge}</Badge> : null}
+            <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+              {!dense && track.hasRichsync ? <Badge tone="brand">{labels.richsyncBadge}</Badge> : null}
+              {!dense && track.hasLyrics ? <Badge>{labels.lyricsBadge}</Badge> : null}
               {isSelect ? (
                 <button
                   type="button"
                   onClick={() => onPlay(track)}
                   aria-pressed={selected}
-                  style={selected ? { backgroundColor: "#ff007f" } : undefined}
+                  style={selected ? { backgroundColor: "#C2563B" } : undefined}
                   className={[
-                    "inline-flex h-11 items-center justify-center rounded-lg px-5 font-condensed text-sm uppercase tracking-[0.04em] transition-transform hover:-translate-y-0.5",
-                    selected ? "text-white" : "border-2 border-black/20 text-[#0b0b0b]",
+                    "inline-flex items-center justify-center rounded-lg font-condensed uppercase tracking-[0.04em] transition-transform hover:-translate-y-0.5",
+                    dense ? "h-9 px-3 text-xs" : "h-11 px-5 text-sm",
+                    selected ? "text-white" : "border-2 border-black/20 text-[#15120E]",
                   ].join(" ")}
                 >
                   {selected ? "✓ Added" : "Add"}
@@ -84,8 +91,11 @@ export default function TrackResults({
                   type="button"
                   onClick={() => onPlay(track)}
                   disabled={loadingTrackId !== null}
-                  style={{ backgroundColor: "#ff007f" }}
-                  className="inline-flex h-11 items-center justify-center rounded-lg px-5 font-condensed text-sm uppercase tracking-[0.04em] text-white transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ backgroundColor: "#C2563B" }}
+                  className={[
+                    "inline-flex items-center justify-center rounded-lg font-condensed uppercase tracking-[0.04em] text-white transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50",
+                    dense ? "h-9 px-3 text-xs" : "h-11 px-5 text-sm",
+                  ].join(" ")}
                 >
                   {loadingTrackId === track.trackId ? labels.loadingRound : labels.playButton}
                 </button>
@@ -104,7 +114,7 @@ function Badge({ children, tone }: { children: string; tone?: "brand" }) {
     <span
       className={[
         "rounded border px-2 py-0.5 font-mono text-[0.65rem] uppercase tracking-[0.1em]",
-        tone === "brand" ? "border-[#ff007f]/40 text-[#d80069]" : "border-black/15 text-black/50",
+        tone === "brand" ? "border-[#C2563B]/40 text-[#A2452E]" : "border-black/15 text-black/50",
       ].join(" ")}
     >
       {children}

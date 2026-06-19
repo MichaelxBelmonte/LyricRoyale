@@ -24,8 +24,8 @@ export default function JCard({
     <div
       // Cream + ink set inline: the dev Tailwind JIT was unreliable at emitting the
       // arbitrary bg/text colour, which left the card transparent (invisible text).
-      style={{ backgroundColor: "#fff1d6", color: "#0b0b0b" }}
-      className={`tx-grain relative overflow-hidden rounded-2xl border-2 border-black/15 shadow-[0_16px_46px_-16px_rgba(255,0,127,0.45)] ${className}`}
+      style={{ backgroundColor: "#F4ECD8", color: "#15120E" }}
+      className={`tx-grain relative overflow-hidden rounded-2xl border-2 border-black/15 shadow-[0_16px_46px_-16px_rgba(194,86,59,0.45)] ${className}`}
     >
       {spine ? (
         <div className="absolute left-0 top-0 flex h-full w-8 items-center justify-center border-r border-black/15 bg-black/[0.04]">

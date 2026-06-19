@@ -10,7 +10,7 @@ import type { PublicSessionState } from "@/lib/session/types";
 import type { Locale } from "@/lib/types";
 
 const FIELD =
-  "mt-2 h-12 w-full rounded-lg border border-black/15 bg-white px-3 text-[#0b0b0b] outline-none transition-colors placeholder:text-black/35 focus:border-[#ff007f] focus:shadow-[0_0_0_3px_rgba(255,0,127,0.15)]";
+  "mt-2 h-12 w-full rounded-lg border border-black/15 bg-white px-3 text-[#15120E] outline-none transition-colors placeholder:text-black/35 focus:border-[#C2563B] focus:shadow-[0_0_0_3px_rgba(194,86,59,0.15)]";
 
 const VOICES: [string, string][] = [
   ["hype", "Hype Host"],
@@ -60,7 +60,7 @@ export default function CreateSession() {
           <Sticker tone="magenta" rotate={-4}>
             Party mode
           </Sticker>
-          <h1 className="mt-4 font-condensed text-4xl uppercase tracking-tight text-[#0b0b0b] sm:text-5xl">
+          <h1 className="mt-4 font-condensed text-4xl uppercase tracking-tight text-[#15120E] sm:text-5xl">
             Create the room
           </h1>
           <p className="mt-2 text-sm leading-6 text-black/60">
@@ -90,7 +90,7 @@ export default function CreateSession() {
                     className={[
                       "h-12 rounded-lg border px-3 font-condensed text-sm uppercase tracking-[0.04em] transition-colors",
                       selected
-                        ? "border-[#ff007f] bg-[#ff007f]/10 text-[#d80069]"
+                        ? "border-[#C2563B] bg-[#C2563B]/10 text-[#A2452E]"
                         : "border-black/15 bg-white text-black/70 hover:border-black/40 hover:text-black",
                     ].join(" ")}
                   >
@@ -122,7 +122,7 @@ export default function CreateSession() {
                     className={[
                       "h-12 rounded-lg border px-3 font-condensed text-sm uppercase tracking-[0.04em] transition-colors",
                       selected
-                        ? "border-[#ff007f] bg-[#ff007f]/10 text-[#d80069]"
+                        ? "border-[#C2563B] bg-[#C2563B]/10 text-[#A2452E]"
                         : "border-black/15 bg-white text-black/70 hover:border-black/40 hover:text-black",
                     ].join(" ")}
                   >
@@ -136,7 +136,7 @@ export default function CreateSession() {
             </p>
           </div>
 
-          {error ? <p className="mt-4 text-sm font-semibold text-[#d80069]">{error}</p> : null}
+          {error ? <p className="mt-4 text-sm font-semibold text-[#A2452E]">{error}</p> : null}
 
           <Button onClick={create} disabled={loading} full className="mt-6">
             {loading ? "Creating…" : "Create session ▶"}

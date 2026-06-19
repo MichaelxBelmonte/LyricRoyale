@@ -63,7 +63,7 @@ export default function MatchResult({
         </Sticker>
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
           <div className="min-w-0">
-            <h2 className="font-condensed text-3xl uppercase tracking-tight text-[#0b0b0b] sm:text-4xl">
+            <h2 className="font-condensed text-3xl uppercase tracking-tight text-[#15120E] sm:text-4xl">
               {rank}
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-black/55">{labels.matchCompleteBody}</p>
@@ -112,7 +112,7 @@ function ResultStat({
       <p className="font-mono text-[0.55rem] uppercase leading-tight tracking-[0.1em] text-black/45">
         {label}
       </p>
-      <p className="mt-1 font-mono text-base tabular-nums text-[#0b0b0b]">
+      <p className="mt-1 font-mono text-base tabular-nums text-[#15120E]">
         {value}
         {suffix ? <span className="ml-0.5 text-xs text-black/45">{suffix}</span> : null}
       </p>

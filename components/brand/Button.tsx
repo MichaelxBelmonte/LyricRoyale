@@ -5,8 +5,8 @@ type Variant = "chrome" | "magenta" | "outlineDark" | "outlineLight";
 
 // Colours set inline so they never depend on Tailwind JIT regeneration.
 const VARIANT_STYLE: Record<Variant, CSSProperties> = {
-  chrome: { backgroundImage: "linear-gradient(to bottom,#eef2f6,#c7ccd4 55%,#9aa1ac)", color: "#0b0b0b" },
-  magenta: { backgroundColor: "#ff007f", color: "#ffffff" },
+  chrome: { backgroundImage: "linear-gradient(to bottom,#eef2f6,#c7ccd4 55%,#9aa1ac)", color: "#15120E" },
+  magenta: { backgroundColor: "#C2563B", color: "#ffffff" },
   outlineDark: {},
   outlineLight: {},
 };
@@ -15,7 +15,7 @@ const VARIANT_CLASS: Record<Variant, string> = {
   chrome:
     "border-2 border-black/25 shadow-[0_5px_0_rgba(0,0,0,0.35),0_16px_26px_-12px_rgba(0,0,0,0.55)] hover:-translate-y-0.5 active:translate-y-1 active:shadow-[0_1px_0_rgba(0,0,0,0.35)]",
   magenta:
-    "shadow-[0_5px_0_rgba(0,0,0,0.28),0_16px_26px_-12px_rgba(255,0,127,0.6)] hover:-translate-y-0.5 active:translate-y-1 active:shadow-[0_1px_0_rgba(0,0,0,0.28)]",
+    "shadow-[0_5px_0_rgba(0,0,0,0.28),0_16px_26px_-12px_rgba(194,86,59,0.6)] hover:-translate-y-0.5 active:translate-y-1 active:shadow-[0_1px_0_rgba(0,0,0,0.28)]",
   outlineDark: "border-2 border-black/25 text-black/80 hover:border-black hover:bg-black/[0.06]",
   outlineLight: "border border-white/20 text-neutral-200 hover:border-white/50 hover:text-white",
 };

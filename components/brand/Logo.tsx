@@ -44,7 +44,7 @@ export default function Logo({
       <Link
         href={href}
         aria-label="Soundclash — home"
-        className="inline-flex shrink-0 rounded-md transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff007f]"
+        className="inline-flex shrink-0 rounded-md transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#C2563B]"
       >
         {content}
       </Link>

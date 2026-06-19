@@ -25,7 +25,7 @@ export default function JoinQr({ url, size = 160, className = "" }: JoinQrProps)
       width: size * 3, // oversample for crisp scaling on hi-dpi / big screens
       margin: 1,
       errorCorrectionLevel: "M",
-      color: { dark: "#0b0b0b", light: "#ffffff" },
+      color: { dark: "#15120E", light: "#ffffff" },
     })
       .then((dataUrl) => {
         if (active) setSrc(dataUrl);

@@ -22,7 +22,7 @@ export default function BottomNav({ items, active, onSelect }: BottomNavProps) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-neutral-850 bg-neutral-950/90 backdrop-blur lg:hidden">
       <div
-        className="mx-auto grid w-full max-w-md pb-[env(safe-area-inset-bottom)] pl-2 pr-[4.5rem]"
+        className="mx-auto grid w-full max-w-md px-2 pb-[env(safe-area-inset-bottom)]"
         style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
       >
         {items.map((item) => {

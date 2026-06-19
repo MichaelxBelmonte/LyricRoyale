@@ -7,36 +7,57 @@ export default function Home() {
   return (
     <>
       <BrandIntro />
-      <main className="relative mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col justify-center px-5 py-8 sm:px-8">
-        <section className="grid items-center gap-8 lg:grid-cols-[1fr_24rem]">
-          <div className="max-w-2xl">
-            <p className="font-mono text-[0.62rem] uppercase tracking-[0.28em] text-[#00e5d2]">
+      <main className="relative mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col justify-center pt-8 pb-[max(2rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] sm:pl-8 sm:pr-8">
+        {/*
+          Mobile: one centered column in reading order — brand, mascot, tagline +
+          actions, then the ambient theme player at the bottom.
+          Desktop (lg): a 2×2 grid — text on the left, mascot/waveform on the right —
+          with each pair meeting at the vertical centre line.
+        */}
+        <section className="flex flex-col items-center gap-6 text-center lg:grid lg:grid-cols-[1fr_22rem] lg:grid-rows-[auto_auto] lg:gap-x-12 lg:gap-y-3 lg:text-left">
+          {/* Brand */}
+          <div className="lg:col-start-1 lg:row-start-1 lg:self-end">
+            <p className="hidden font-mono text-[0.62rem] uppercase tracking-[0.28em] text-[#2E7D6B] lg:block">
               Music party game
             </p>
-            <h1 className="mt-4">
+            <h1 className="lg:mt-4">
               <span className="sr-only">Soundclash</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/brand/wordmark.png"
                 alt="Soundclash"
-                className="h-16 w-auto max-w-full sm:h-24"
+                className="mx-auto h-14 w-auto max-w-full sm:h-20 lg:mx-0 lg:h-24"
               />
             </h1>
-            <p className="mt-4 max-w-xl font-condensed text-2xl uppercase tracking-[0.04em] text-[#fff1d6] sm:text-4xl">
+          </div>
+
+          {/* Mascot — the hero on mobile */}
+          <div className="lg:col-start-2 lg:row-start-1 lg:self-end">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/mascot.png"
+              alt="BEATBOT, the Soundclash host"
+              className="mx-auto h-40 w-auto object-contain drop-shadow-[0_22px_28px_rgba(0,0,0,0.38)] sm:h-48 lg:h-72"
+            />
+          </div>
+
+          {/* Tagline + actions */}
+          <div className="flex w-full max-w-sm flex-col items-center gap-5 sm:max-w-md lg:col-start-1 lg:row-start-2 lg:max-w-none lg:items-start lg:self-start lg:gap-6">
+            <p className="font-condensed text-xl uppercase tracking-[0.04em] text-[#F4ECD8] sm:text-2xl lg:max-w-xl lg:text-4xl">
               Same track. Different challenge.
             </p>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
               <Link
                 href="/host/new"
-                className="inline-flex h-14 items-center justify-center gap-3 rounded-xl bg-[#fff1d6] px-7 font-condensed text-xl uppercase tracking-[0.06em] text-black shadow-[0_5px_0_rgba(255,0,127,0.55)] transition-transform hover:-translate-y-0.5 active:translate-y-0.5 sm:w-auto"
+                className="inline-flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-[#F4ECD8] px-7 font-condensed text-xl uppercase tracking-[0.06em] text-black shadow-[0_5px_0_rgba(194,86,59,0.55)] transition-transform hover:-translate-y-0.5 active:translate-y-0.5 sm:w-auto"
               >
                 Start clash
-                <Icon name="play" size={18} className="text-[#ff007f]" />
+                <Icon name="play" size={18} className="text-[#C2563B]" />
               </Link>
               <Link
                 href="/join"
-                className="inline-flex h-14 items-center justify-center rounded-xl border border-white/15 px-7 font-condensed text-xl uppercase tracking-[0.06em] text-[#fff1d6] transition-colors hover:border-[#00e5d2] hover:text-[#00e5d2] sm:w-auto"
+                className="inline-flex h-14 w-full items-center justify-center rounded-xl border border-white/15 px-7 font-condensed text-xl uppercase tracking-[0.06em] text-[#F4ECD8] transition-colors hover:border-[#2E7D6B] hover:text-[#2E7D6B] sm:w-auto"
               >
                 Join
               </Link>
@@ -44,28 +65,19 @@ export default function Home() {
 
             <Link
               href="/solo"
-              className="mt-5 inline-flex font-mono text-[0.62rem] uppercase tracking-[0.22em] text-white/35 transition-colors hover:text-[#00e5d2]"
+              className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-white/35 transition-colors hover:text-[#2E7D6B]"
             >
               Solo lab
             </Link>
           </div>
 
-          <div className="mx-auto w-full max-w-sm lg:max-w-none">
-            <div className="flex justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/brand/mascot.png"
-                alt="BEATBOT, the Soundclash host"
-                className="h-48 w-auto object-contain drop-shadow-[0_22px_28px_rgba(0,0,0,0.38)] sm:h-64 lg:h-80"
-              />
-            </div>
-            <div className="mt-2">
-              <HomeWaveform />
-            </div>
+          {/* Ambient theme player */}
+          <div className="w-full max-w-xs lg:col-start-2 lg:row-start-2 lg:max-w-none lg:self-start">
+            <HomeWaveform />
           </div>
         </section>
 
-        <footer className="mt-10 font-mono text-[0.58rem] uppercase tracking-[0.24em] text-white/25">
+        <footer className="mt-10 hidden font-mono text-[0.58rem] uppercase tracking-[0.24em] text-white/25 lg:block">
           Soundclash · Musixmatch Musicathon 2026
         </footer>
       </main>

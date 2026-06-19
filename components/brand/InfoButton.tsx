@@ -19,7 +19,7 @@ export default function InfoButton() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label="How it works"
-        className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/40 font-condensed text-lg lowercase text-white backdrop-blur transition-colors hover:border-[#00e5d2] hover:text-[#00e5d2]"
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/40 font-condensed text-lg lowercase text-white backdrop-blur transition-colors hover:border-[#2E7D6B] hover:text-[#2E7D6B]"
       >
         i
       </button>
@@ -30,7 +30,7 @@ export default function InfoButton() {
           <ul className="mt-3 space-y-3">
             {POINTS.map(([title, body]) => (
               <li key={title}>
-                <p className="text-xs font-semibold text-[#7df2e8]">{title}</p>
+                <p className="text-xs font-semibold text-[#86BDB0]">{title}</p>
                 <p className="mt-0.5 text-xs leading-5 text-neutral-400">{body}</p>
               </li>
             ))}

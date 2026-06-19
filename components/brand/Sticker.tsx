@@ -3,11 +3,11 @@ import type { CSSProperties, ReactNode } from "react";
 type Tone = "magenta" | "tangerine" | "aqua" | "yellow" | "cream";
 
 const TONES: Record<Tone, string> = {
-  magenta: "bg-[#ff007f] text-white",
-  tangerine: "bg-[#ff6402] text-white",
-  aqua: "bg-[#00e5d2] text-black",
+  magenta: "bg-[#C2563B] text-white",
+  tangerine: "bg-[#D99A3C] text-white",
+  aqua: "bg-[#2E7D6B] text-black",
   yellow: "bg-[#ffd400] text-black",
-  cream: "bg-[#fff1d6] text-black",
+  cream: "bg-[#F4ECD8] text-black",
 };
 
 interface StickerProps {

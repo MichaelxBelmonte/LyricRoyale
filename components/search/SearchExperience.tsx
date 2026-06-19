@@ -305,7 +305,7 @@ export default function SearchExperience() {
             <div className={lobbyTab === "songs" ? "block" : "hidden lg:block"}>
               <JCard contentClassName="space-y-4 p-4 sm:p-5">
                 <div>
-                  <p className="font-condensed text-sm uppercase tracking-[0.2em] text-[#0b0b0b]">
+                  <p className="font-condensed text-sm uppercase tracking-[0.2em] text-[#15120E]">
                     {text.songLobbyTitle}
                   </p>
                   <p className="mt-1 text-sm text-black/50">
@@ -321,7 +321,7 @@ export default function SearchExperience() {
                   onSubmit={handleSearch}
                 />
 
-                {error ? <p className="text-sm font-semibold text-[#d80069]">{error}</p> : null}
+                {error ? <p className="text-sm font-semibold text-[#A2452E]">{error}</p> : null}
 
                 <TrackResults
                   results={results}
