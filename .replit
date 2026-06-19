@@ -1,0 +1,22 @@
+# Replit config for Soundclash — Next.js (App Router) running natively.
+# Having this file makes Replit treat the repo as an already-configured Node app,
+# so it does NOT try to migrate it to Vite/Express. Deploy as a Reserved VM.
+
+modules = ["nodejs-20"]
+run = "next dev -H 0.0.0.0"
+
+[nix]
+channel = "stable-24_05"
+
+# Deployment: build the Next.js app, then start the production server.
+# In the Deploy UI choose **Reserved VM** (always-on, single instance) — NOT Autoscale,
+# because room sessions live in the server process.
+[deployment]
+deploymentTarget = "vm"
+build = ["npm", "run", "build"]
+run = ["npm", "run", "start"]
+
+# Map the Next.js port to the public web port.
+[[ports]]
+localPort = 3000
+externalPort = 80
