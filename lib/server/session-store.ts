@@ -41,11 +41,11 @@ const DEFAULT_MINI_GAMES: MiniGameId[] = ALL_MINI_GAME_IDS;
 type Store = Map<string, PartySession>;
 
 const globalForSessions = globalThis as typeof globalThis & {
-  __lyricRoyaleSessions?: Store;
+  __soundclashSessions?: Store;
 };
 
-const sessions: Store = globalForSessions.__lyricRoyaleSessions ?? new Map();
-globalForSessions.__lyricRoyaleSessions = sessions;
+const sessions: Store = globalForSessions.__soundclashSessions ?? new Map();
+globalForSessions.__soundclashSessions = sessions;
 
 function now(): number {
   return Date.now();
@@ -469,7 +469,7 @@ export async function submitAnswer(sessionCode: string, input: SubmitAnswerInput
   const solution = round.solution ?? "";
   const correct = normalizeAnswer(guess) === normalizeAnswer(solution);
   const points =
-    round.miniGame === "on_beat" && round.drop
+    (round.miniGame === "on_beat" || round.miniGame === "the_drop") && round.drop
       ? scoreRound({
           isCorrect: correct,
           elapsedMs,
