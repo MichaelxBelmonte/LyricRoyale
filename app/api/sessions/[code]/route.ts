@@ -5,6 +5,7 @@ import {
   revealRound,
   setMiniGames,
   setSessionRounds,
+  setTrackStem,
   touchPlayer,
 } from "@/lib/server/session-store";
 import type { MiniGameId } from "@/lib/session/types";
@@ -41,12 +42,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     action?: string;
     miniGames?: MiniGameId[];
     rounds?: number;
+    stem?: { trackId?: number; trackName?: string; stem?: string; url?: string };
   };
   try {
     if (body.action === "reveal") return NextResponse.json({ session: revealRound(code) });
     if (body.action === "lobby") return NextResponse.json({ session: backToLobby(code) });
     if (body.action === "configure") return NextResponse.json({ session: setMiniGames(code, body.miniGames ?? []) });
     if (body.action === "rounds") return NextResponse.json({ session: setSessionRounds(code, Number(body.rounds)) });
+    if (body.action === "set_stem") return NextResponse.json({ session: setTrackStem(code, body.stem ?? {}) });
     return NextResponse.json<ErrorResponse>(
       { error: "Invalid session action.", code: "invalid_session_action" },
       { status: 400 },

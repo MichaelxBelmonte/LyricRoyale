@@ -26,6 +26,14 @@ const ART: Record<MiniGameId, ReactNode> = {
       <rect x="80" y="36" width="6" height="20" rx="3" fill={FAINT} />
     </>
   ),
+  // Stem Heist — one isolated waveform among muted layers.
+  stem_heist: (
+    <>
+      <path d="M16 24h80" stroke={FAINT} strokeWidth="3" strokeLinecap="round" />
+      <path d="M16 48h80" stroke={FAINT} strokeWidth="3" strokeLinecap="round" />
+      <path d="M18 36q8-14 16 0t16 0 16 0 16 0" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </>
+  ),
   // Finish the Line — lyric bars with the last word as a blank.
   finish_line: (
     <>

@@ -47,6 +47,9 @@ export const MINI_GAME_CATALOG: MiniGameMeta[] = [
   // Generated-audio games (need ELEVENLABS_API_KEY; reuse cut games' art).
   { id: "genre_roulette", name: "Genre Roulette", blurb: "Name the vibe of the beat.", example: "what genre is this beat?", category: "trivia", image: "/games/the_drop.png" },
   { id: "beat_lock", name: "Beat Lock", blurb: "Tap on the beat — timing scores.", example: "tap on every beat", category: "timing", image: "/games/on_beat.png" },
+  // Real-song stem game (needs LALAL_API_KEY + host-uploaded audio prepared in
+  // the Stem Lab; reuses song_mash.png). Only playable once >=4 stems are ready.
+  { id: "stem_heist", name: "Stem Heist", blurb: "Name the track from one isolated stem.", example: "guess the song from just the bass", category: "trivia", image: "/games/song_mash.png" },
 ];
 
 // Façade-only entries shown in the host gallery as "Coming soon". They are NOT
@@ -58,8 +61,6 @@ export interface ComingSoonGame {
 }
 
 export const COMING_SOON_GAMES: ComingSoonGame[] = [
-  { id: "stem_heist", name: "Stem Heist", blurb: "Guess the song from one isolated stem." },
-  { id: "beat_roulette", name: "Beat Roulette", blurb: "BEATBOT spins up a fresh beat to play on." },
   { id: "karaoke_clash", name: "Karaoke Clash", blurb: "Sing the line — pitch & timing scored." },
   { id: "rap_battle", name: "Rap Battle", blurb: "Fill the bar before the beat drops." },
 ];

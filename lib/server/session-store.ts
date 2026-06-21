@@ -148,6 +148,7 @@ export function createSession(input: CreateSessionInput = {}): PublicSessionStat
     contentSeed: (createdAt ^ Math.floor(Math.random() * 0xffffffff)) >>> 0,
     difficultyFloor: clampFloor(input.difficultyFloor),
     usedPromptKeys: [],
+    trackStems: {},
     autopilot: input.autopilot ?? true,
     trackPool: [],
     players: [],
@@ -227,6 +228,32 @@ function isPlayable(game: MiniGameId, hasRichsync: boolean): boolean {
   return !NEEDS_RICHSYNC.has(game) || hasRichsync;
 }
 
+function countReadyStems(session: PartySession): number {
+  return Object.keys(session.trackStems).length;
+}
+
+// Session-aware readiness: Stem Heist additionally needs lalal.ai configured and
+// >=4 host-prepared stems; everything else falls back to the static isPlayable.
+function gameReady(session: PartySession, game: MiniGameId, hasRichsync: boolean): boolean {
+  if (game === "stem_heist") return Boolean(process.env.LALAL_API_KEY) && countReadyStems(session) >= 4;
+  return isPlayable(game, hasRichsync);
+}
+
+// Deterministic seeded helpers for audio/stem rounds (mirrors finish-line's seed
+// behavior without exporting its internals).
+function seedIndex(seed: number, size: number): number {
+  if (size <= 0) return 0;
+  return Math.abs(Math.trunc(seed)) % size;
+}
+function seedShuffle<T>(items: readonly T[], seed: number): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.abs(Math.trunc(mix(seed, i))) % (i + 1);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 // Pick the next mini-game for an autopilot round. Draws from the session's
 // shuffled rotation WITHOUT replacement within a cycle, so the 6-round set is
 // varied and (with ≥6 games selected) never repeats. When the chosen game needs
@@ -234,7 +261,7 @@ function isPlayable(game: MiniGameId, hasRichsync: boolean): boolean {
 // game rather than collapsing every such slot onto "finish_line".
 function nextMiniGame(session: PartySession, requested: MiniGameId | undefined, hasRichsync: boolean): MiniGameId {
   // Manual override: honor the host's pick (degrading only on richsync mismatch).
-  if (requested) return isPlayable(requested, hasRichsync) ? requested : "finish_line";
+  if (requested) return gameReady(session, requested, hasRichsync) ? requested : "finish_line";
 
   const rotation = session.rotation.length ? session.rotation : DEFAULT_MINI_GAMES;
   const cycleLen = rotation.length;
@@ -247,10 +274,10 @@ function nextMiniGame(session: PartySession, requested: MiniGameId | undefined, 
   const usedThisCycle = new Set<MiniGameId>(played.slice(cycleStart));
 
   return (
-    rotation.find((g) => isPlayable(g, hasRichsync) && !usedThisCycle.has(g) && g !== lastGame) ??
-    rotation.find((g) => isPlayable(g, hasRichsync) && !usedThisCycle.has(g)) ??
-    rotation.find((g) => isPlayable(g, hasRichsync) && g !== lastGame) ??
-    rotation.find((g) => isPlayable(g, hasRichsync)) ??
+    rotation.find((g) => gameReady(session, g, hasRichsync) && !usedThisCycle.has(g) && g !== lastGame) ??
+    rotation.find((g) => gameReady(session, g, hasRichsync) && !usedThisCycle.has(g)) ??
+    rotation.find((g) => gameReady(session, g, hasRichsync) && g !== lastGame) ??
+    rotation.find((g) => gameReady(session, g, hasRichsync)) ??
     "finish_line"
   );
 }
@@ -377,6 +404,50 @@ function buildAudioRound(input: {
   };
 }
 
+// Stem Heist: play one host-prepared isolated stem (real song) and pick its track
+// from the deck. Needs >=4 prepared stems (gated upstream in gameReady).
+function buildStemHeistRound(input: {
+  session: PartySession;
+  track: SessionTrackRef;
+  roundIndex: number;
+  tier: DifficultyTier;
+  diff: RoundDifficultyConfig;
+  seed: number;
+  startedAt: number;
+}): SessionRound {
+  const entries = Object.entries(input.session.trackStems).map(([id, value]) => ({
+    trackId: Number(id),
+    ...value,
+  }));
+  if (entries.length < 4) throw new Error("stem_heist_not_ready");
+  const correct = entries[seedIndex(input.seed, entries.length)];
+  const others = entries.filter((entry) => entry.trackId !== correct.trackId).map((entry) => entry.trackName);
+  const distractors = seedShuffle(others, input.seed).slice(0, Math.max(1, input.diff.optionCount - 1));
+  const options = seedShuffle([correct.trackName, ...distractors], input.seed + 7).slice(0, input.diff.optionCount);
+  return {
+    index: input.roundIndex,
+    miniGame: "stem_heist",
+    title: "Stem Heist",
+    instruction: "Name the track from this isolated stem.",
+    trackId: correct.trackId,
+    trackName: correct.trackName,
+    artistName: input.track.artistName,
+    hasRichsync: input.track.hasRichsync,
+    seed: input.seed,
+    difficulty: input.tier,
+    timeLimitMs: input.diff.timeLimitMs,
+    prompt: "",
+    answerType: "choice",
+    options,
+    solution: correct.trackName,
+    audioUrl: correct.url,
+    startedAt: input.startedAt,
+    endsAt: input.startedAt + input.diff.timeLimitMs,
+    status: "answering",
+    answers: [],
+  };
+}
+
 async function buildSessionRound(input: {
   session: PartySession;
   track: SessionTrackRef;
@@ -393,6 +464,19 @@ async function buildSessionRound(input: {
   if (input.miniGame === "genre_roulette" || input.miniGame === "beat_lock") {
     return buildAudioRound({
       miniGame: input.miniGame,
+      track: input.track,
+      roundIndex,
+      tier,
+      diff,
+      seed: input.seed,
+      startedAt: input.startedAt,
+    });
+  }
+
+  // Stem Heist plays a host-prepared isolated stem — also lyric-free.
+  if (input.miniGame === "stem_heist") {
+    return buildStemHeistRound({
+      session: input.session,
       track: input.track,
       roundIndex,
       tier,
@@ -612,7 +696,7 @@ export async function startRound(sessionCode: string, input: StartRoundInput): P
     // Build failed (e.g. too small a track pool for a trivia round). Try one
     // different playable game before collapsing to finish_line, to keep variety.
     const alt = session.rotation.find(
-      (g) => g !== miniGame && g !== "finish_line" && isPlayable(g, hasRichsync),
+      (g) => g !== miniGame && g !== "finish_line" && gameReady(session, g, hasRichsync),
     );
     try {
       if (!alt) throw err;
@@ -698,6 +782,25 @@ export function revealRound(sessionCode: string): PublicSessionState {
   if (session.currentRound) session.currentRound.status = "revealed";
   session.status = "results";
   session.updatedAt = now();
+  return publicState(session);
+}
+
+// Attach a host-prepared isolated stem to a deck track (Stem Lab → lalal.ai).
+// Once >=4 are attached, Stem Heist becomes selectable.
+export function setTrackStem(
+  sessionCode: string,
+  entry: { trackId?: number; trackName?: string; stem?: string; url?: string },
+): PublicSessionState {
+  const session = assertSession(sessionCode);
+  const trackId = Number(entry.trackId);
+  if (Number.isInteger(trackId) && trackId > 0 && typeof entry.url === "string" && entry.url) {
+    session.trackStems[trackId] = {
+      stem: String(entry.stem || "stem"),
+      url: entry.url,
+      trackName: String(entry.trackName || "Track"),
+    };
+    session.updatedAt = now();
+  }
   return publicState(session);
 }
 

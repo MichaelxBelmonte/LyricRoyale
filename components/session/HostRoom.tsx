@@ -9,6 +9,7 @@ import AudioConsole from "@/components/session/AudioConsole";
 import JoinQr from "@/components/session/JoinQr";
 import MiniGameArt from "@/components/session/MiniGameArt";
 import MusicPicker from "@/components/session/MusicPicker";
+import StemLab from "@/components/session/StemLab";
 import { MusixmatchTracking } from "@/components/session/MusixmatchTracking";
 import Avatar from "@/components/ui/Avatar";
 import Icon from "@/components/ui/Icon";
@@ -852,6 +853,12 @@ export default function HostRoom({ code }: { code: string }) {
                   )}
                 </div>
               </div>
+
+              {session && session.miniGames.includes("stem_heist") ? (
+                <div className="border-t border-black/10 p-5 sm:p-6">
+                  <StemLab code={session.code} deck={deck} />
+                </div>
+              ) : null}
 
               {/* START */}
               <div className="border-t border-black/10 bg-black/[0.02] p-5 sm:p-6">

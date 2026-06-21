@@ -15,7 +15,9 @@ export type MiniGameId =
   | "on_beat"
   // Generated-audio games (no lyrics, no licensing — ElevenLabs Music beds).
   | "genre_roulette"
-  | "beat_lock";
+  | "beat_lock"
+  // Real-song stem game (host-uploaded audio separated via lalal.ai).
+  | "stem_heist";
 export type HostVoicePreset = "hype" | "judge" | "diva" | "custom";
 export type RoundAnswerType = "text" | "choice" | "tap";
 
@@ -24,6 +26,15 @@ export interface SessionTrackRef {
   trackName: string;
   artistName: string;
   hasRichsync?: boolean;
+}
+
+// A prepared, isolated stem for one deck track (host BYO-upload → lalal.ai).
+// Stored on the session keyed by trackId; the URL points to lalal's CDN and is
+// ephemeral (expires with the source). Powers Stem Heist.
+export interface TrackStem {
+  stem: string;
+  url: string;
+  trackName: string;
 }
 
 export interface HostVoiceConfig {
@@ -108,6 +119,9 @@ export interface PartySession {
   difficultyFloor: DifficultyFloor;
   // Recently-used prompt keys (normalized lines) for cross-round anti-repetition.
   usedPromptKeys: string[];
+  // Prepared isolated stems per deck trackId (host Stem Lab → lalal.ai). Powers
+  // Stem Heist, which is only playable once >=4 are ready.
+  trackStems: Record<number, TrackStem>;
   autopilot: boolean;
   trackPool: SessionTrackRef[];
   players: SessionPlayer[];
