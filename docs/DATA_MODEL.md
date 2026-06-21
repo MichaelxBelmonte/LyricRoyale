@@ -337,7 +337,7 @@ The `copyright` field on the runtime `Round` carries the Musixmatch `lyrics_copy
 
 ## Server-side access and key safety
 
-All provider calls happen **only** in the Next.js server (route handlers / server actions) acting as a proxy — the browser never sees server-side secrets. Today this covers Musixmatch (`/api/mxm/*`), ElevenLabs (`/api/host/speak`), and LALAL.AI (`/api/lalal/*`). The Claude calls and any privileged DB write (e.g. inserting `rounds`) below are ⏳ **Planned** — Claude integration and the Supabase tables are not built yet.
+All provider calls happen **only** in the Next.js server (route handlers / server actions) acting as a proxy — the browser never sees server-side secrets. Today this covers Musixmatch (`/api/mxm/*`), ElevenLabs (`/api/host/speak`), LALAL.AI (`/api/lalal/*`), and one Claude call (server-side host-banter localization in `lib/server/anthropic.ts`, via raw `fetch`). The Claude *round-text* regeneration (P1–P6) and any privileged DB write (e.g. inserting `rounds`) below are ⏳ **Planned** — round text is still built by deterministic server code, and the Supabase tables are not built yet.
 
 Environment variables (server-side secrets unless prefixed `NEXT_PUBLIC`):
 
@@ -346,7 +346,7 @@ Environment variables (server-side secrets unless prefixed `NEXT_PUBLIC`):
 | `MXM_KEY` | server | Musixmatch API | Live |
 | `ELEVENLABS_API_KEY` | server | ElevenLabs TTS (`xi-api-key` header) | Live |
 | `LALAL_API_KEY` | server | LALAL.AI stem separation | Live |
-| `ANTHROPIC_API_KEY` | server | Claude (`claude-opus-4-8`) | ⏳ Planned (no `@anthropic-ai` dep; host banter is string templates, not an LLM) |
+| `ANTHROPIC_API_KEY` | server | Claude (`claude-opus-4-8`) — host-banter localization only (raw `fetch`, no `@anthropic-ai` dep). Round/text regeneration (P1–P6) is still ⏳ Planned. | Partial |
 | `SUPABASE_DB_PASSWORD` | server | Migrations / privileged DB access | ⏳ Planned |
 | `SUPABASE_PROJECT_REF` | server | Supabase project reference; keep the real value in `.env.local` / deployment secrets only. | ⏳ Planned |
 | `NEXT_PUBLIC_SUPABASE_URL` | public | Browser Supabase client | ⏳ Planned |

@@ -1,6 +1,6 @@
 # Compliance & Security
 
-> **Status:** This document describes the **target architecture**, not the current build. The in-memory lyric-handling posture (references only, no lyric-text persistence, server-side keys) is **live today**. Supabase Postgres/RLS, Anthropic Claude for round/decoy/mood generation, and the async-challenge routes below are **PLANNED, not yet built** — there is no `@supabase` or `@anthropic-ai` dependency, and routes such as `/api/round/generate`, `/api/host/banter`, `/api/mood`, and `/api/challenge` do not exist. Host banter is currently localized string templates, not an LLM. For exactly what is live today, see [`../README.md`](../README.md) → "Status & known limitations".
+> **Status:** This document describes the **target architecture**, not the current build. The in-memory lyric-handling posture (references only, no lyric-text persistence, server-side keys) is **live today**. Supabase Postgres/RLS and Anthropic Claude for round/decoy/mood generation are **PLANNED, not yet built** — there is no `@supabase` or `@anthropic-ai` dependency, and routes such as `/api/round/generate`, `/api/mood`, and `/api/challenge` do not exist. **Claude is now live for one narrow use only**: localizing the BEATBOT host banter pack into non-English/Italian narrator languages (`lib/server/anthropic.ts`), called via raw `fetch` (no SDK). It receives only an English template pack plus a language name — **never any session, player, or lyric data** (see [§5](#5-claude--llm-lyric-handling--planned)). For exactly what is live today, see [`../README.md`](../README.md) → "Status & known limitations".
 
 This document is the single source of truth for how **Soundclash** handles licensed lyric content, provider secrets, and contest content-usage rules. It is written to be **judge-verifiable**: every claim below can be checked against the public repo, the running demo, or a network trace.
 
@@ -185,7 +185,7 @@ This richsync body is fetched live, used for the karaoke stretch mode, and never
 
 ### 3.1 Server-side proxy — the browser never sees a secret
 
-All provider calls happen **only** inside Next.js server route handlers / server actions acting as a proxy. The browser talks to our own API routes; our server talks to the providers with secret keys. Live today: Musixmatch (`lib/server/musixmatch.ts`), ElevenLabs TTS (`lib/server/elevenlabs.ts`), and LALAL.AI stems (`lib/server/lalal.ts`). Planned: Anthropic Claude and Supabase service operations (neither dependency is installed yet).
+All provider calls happen **only** inside Next.js server route handlers / server actions acting as a proxy. The browser talks to our own API routes; our server talks to the providers with secret keys. Live today: Musixmatch (`lib/server/musixmatch.ts`), ElevenLabs TTS (`lib/server/elevenlabs.ts`), LALAL.AI stems (`lib/server/lalal.ts`), and Anthropic Claude for host-banter localization only (`lib/server/anthropic.ts`, server-only, raw `fetch` — no SDK dependency). Planned: Supabase service operations and the broader Claude round/decoy/mood generation (no `@supabase` dependency is installed yet).
 
 ```
 Browser ──> /api/* (Next.js server route / action) ──> Musixmatch / ElevenLabs / Anthropic
@@ -286,9 +286,23 @@ Lyric prompts, options, answers, and `lyrics_copyright` strings exist **only in 
 
 ---
 
-## 5. Claude / LLM Lyric Handling (⏳ Planned)
+## 5. Claude / LLM Handling
 
-> **Planned, not built.** There is no `@anthropic-ai/sdk` dependency and no LLM is called today; host banter is currently localized string templates in `lib/game/host-banter.ts`. The policy below applies once Claude is wired in.
+### 5.1 Live today: host-banter localization (no lyric or session data)
+
+One Claude call is live, and it touches **no licensed content and no user/session data**. When a host picks a narrator language other than English or Italian, `resolveBanterPack` (`lib/server/anthropic.ts`) localizes the BEATBOT host "banter pack" into that language. English and Italian use built-in static packs (`lib/game/host-banter.ts`) and never call Claude.
+
+- **What is sent to Anthropic:** only the English template pack (`{placeholder}`-token strings like "round {index}" and the room-code/leader templates) plus the target language name. **No lyric text, no player names, no guesses, no track IDs, and no session data are ever sent** — runtime values are interpolated into the returned template strings in our own code, after the call.
+- **Transport:** server-only module, raw `fetch` to `POST https://api.anthropic.com/v1/messages` (no `@anthropic-ai/sdk` dependency); `cache: "no-store"`; structured JSON output via `output_config.format` (`json_schema`).
+- **Caching:** a generated pack is cached **module-global, keyed by language code** for the life of the warm server process; it holds only language templates, never session content. There is no disk/DB persistence of Claude output.
+- **Fallback:** if `ANTHROPIC_API_KEY` is absent or Claude is unavailable (non-200, refusal, unparseable, or any error), the code falls back to the English pack so the show always has lines — i.e. those languages silently narrate in English text, never an empty/broken render.
+- **Model:** `claude-opus-4-8` by default (override via `ANTHROPIC_BANTER_MODEL`).
+
+> Operational note: error logging in `anthropic.ts` records only the HTTP status / error message — never the prompt or response body.
+
+### 5.2 Planned: Claude lyric handling (⏳ not built)
+
+> **Planned, not built.** No LLM call touches lyric text today; the round/decoy/mood prompts below do not exist yet. The policy applies once they are wired in.
 
 In the target design, lyric usage inside LLM calls is **transient**:
 
@@ -332,4 +346,4 @@ For the Musixmatch Musicathon 2026 submission, Soundclash operates strictly with
 
 ---
 
-_Last reviewed: 2026-06-16. Maintainer: solo developer. See [`README.md`](../README.md) for project overview and demo URL._
+_Last reviewed: 2026-06-20. Maintainer: solo developer. See [`README.md`](../README.md) for project overview and demo URL._

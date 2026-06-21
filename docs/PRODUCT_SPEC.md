@@ -1,6 +1,6 @@
 # Soundclash — Product Specification
 
-> **Status:** This spec describes the **target architecture**, not the current build. Several capabilities below are **PLANNED, not yet built** — notably Supabase/Postgres + Row Level Security and any DB-backed scores/challenges/leaderboards, Claude/Anthropic round generation and host banter (host banter today is localized string templates, not an LLM), async share-slug challenges, and the routes `/api/round/generate`, `/api/host/banter`, `/api/mood`, `/api/challenge`, `/api/stems`, `/api/mxm/lyrics`, `/api/mxm/subtitle`, `/api/mxm/match`. What is **live today** is an in-memory session store with ~1s HTTP polling (no DB), real Musixmatch/ElevenLabs/LALAL.AI proxy routes, and server-side answer regeneration. For exactly what ships today, see the **"Status & known limitations"** section of [`README.md`](../README.md).
+> **Status:** This spec describes the **target architecture**, not the current build. Several capabilities below are **PLANNED, not yet built** — notably Supabase/Postgres + Row Level Security and any DB-backed scores/challenges/leaderboards, Claude/Anthropic **round generation**, async share-slug challenges, and the routes `/api/round/generate`, `/api/host/banter`, `/api/mood`, `/api/challenge`, `/api/stems`, `/api/mxm/lyrics`, `/api/mxm/subtitle`, `/api/mxm/match`. What is **live today** is an in-memory session store with ~1s HTTP polling (no DB), real Musixmatch/ElevenLabs/LALAL.AI proxy routes, server-side answer regeneration, and a **localized host-banter layer**: the host picks one of 29 narrator languages at room creation; English/Italian banter is shipped as hand-written static packs, and any other language is generated once by Claude (via a server-side `fetch` to the Anthropic Messages API, no SDK) and cached, falling back to the English pack when no `ANTHROPIC_API_KEY` is set. Round prompts/options/answers are still built by server-side round logic, not Claude. For exactly what ships today, see the **"Status & known limitations"** section of [`README.md`](../README.md).
 
 > A zero-install **music party game** built on real Musixmatch lyrics, phone controllers, a shared host screen, and an AI showrunner voice. Built for the Musixmatch Musicathon 2026.
 
@@ -48,13 +48,13 @@ Judging is four criteria, **25% each**: Originality, Craft, Use of Musixmatch AP
 This walkthrough is the primary shared-room demo flow.
 
 1. **Land.** The host opens the demo URL and sees the minimal Soundclash home screen: wordmark, BEATBOT, primary actions, and the animated signature waveform.
-2. **Create room.** The host creates a session at `/host/new`, choosing a voice preset.
+2. **Create room.** The host creates a session at `/host/new`, choosing a voice preset and one of **29 narrator languages** (BEATBOT then speaks/roasts in that language).
 3. **Join.** Players open `/join`, enter the room code, and can leave the stage name empty for an automatic name.
-4. **Start show.** The host taps **Auto-pick show** or chooses one seed track from Musixmatch search.
-5. **Autopilot.** BEATBOT speaks the first round, then Soundclash rotates a 6-round mini-game set automatically.
+4. **Start show.** The host builds a setlist — by **artist** (top tracks for a name), by **genre**, or by free-text **song** search on Musixmatch — or taps **Surprise me** for an auto-seeded deck (capped at 8 tracks).
+5. **Autopilot.** BEATBOT speaks the first round, then Soundclash rotates a host-chosen mini-game set automatically (**3, 6, or 9 rounds**; 6 by default).
 6. **Play.** Phones show one simple action: tap an option or lock an answer before reveal. Static ElevenLabs/LALAL audio assets carry the room from setup into gameplay when browser playback is available.
 7. **Reveal.** The host screen reveals the answer, scoreboard, and voice line; the next round starts automatically.
-8. **Finale.** After round 6, final scores are locked and the winner is crowned.
+8. **Finale.** After the final round, final scores are locked and the winner is crowned.
 
 No lyric text is ever stored or redistributed. Every prompt/option/answer is
 regenerated live at play time from a Musixmatch fetch plus server-side round
@@ -201,8 +201,19 @@ it as transient: never logged, cached, or stored. See [`PROMPTS.md`](./PROMPTS.m
 
 ## 7. The AI Host
 
-The host is an ElevenLabs TTS voice driven by short, punchy lines. Current room
-events use templated lines; Claude can later generate mood-aware event copy.
+The host is an ElevenLabs TTS voice driven by short, punchy lines. Room events
+use templated lines (welcome, round intro, roast, reveal, finale) filled with
+runtime values — player names, guesses, the solution, room code, leader — in
+code, never by an LLM. Each session carries a **narrator language** chosen by the
+host (`narratorLang`, one of 29; see [`languages.ts`](../lib/game/languages.ts)),
+sent to ElevenLabs as `language_code` on every TTS call (`eleven_multilingual_v2`).
+The line templates themselves are localized into that language: English and
+Italian ship as hand-written static packs (instant, deterministic); any other
+language is generated once by Claude from the English reference pack and cached
+per-language, falling back to the English pack when `ANTHROPIC_API_KEY` is unset
+or the call fails — so the show always has lines. Claude only ever sees/returns
+`{placeholder}` templates, never live session data. Mood-aware, fully
+LLM-authored event copy is still planned.
 
 The app also includes a lightweight music bed. The home waveform uses a
 personalized ElevenLabs Music v2 signature with an original Soundclash vocal
@@ -376,7 +387,7 @@ Musixmatch key verified **live**:
 
 **ElevenLabs** verified: tier creator, ~131k credits. `POST /v1/text-to-speech/{voice_id}` returns 200 `audio/mpeg`; auth via the `xi-api-key` header.
 
-**Anthropic (Claude):** ⏳ **Planned, not built.** There is no `@anthropic-ai/sdk` dependency and no Claude calls wired in today; round prompts/options/answers are regenerated server-side from Musixmatch fetches plus round logic, and host banter is localized string templates (`lib/game/host-banter.ts`), not an LLM. When wired, the target model is `claude-opus-4-8`, all host/round generation will run server-side, and the browser will never see the key.
+**Anthropic (Claude):** Partially wired. **Live today:** host-banter localization. For any narrator language other than English/Italian (which use static packs), `resolveBanterPack` (`lib/server/anthropic.ts`) calls Claude server-side via a raw `fetch` to `POST https://api.anthropic.com/v1/messages` — no `@anthropic-ai/sdk` dependency — using structured outputs (`output_config.format` `json_schema`) to localize the English `{placeholder}` templates, caching the result per-language. The default model is `claude-opus-4-8` (override via `ANTHROPIC_BANTER_MODEL`); `ANTHROPIC_API_KEY` is only needed for non-en/it languages, and a missing key / non-200 / refusal / unparseable response falls back to the English pack. **⏳ Still planned:** Claude-authored round prompts/options/answers and mood/theme — round prompts/options/answers are regenerated server-side from Musixmatch fetches plus round logic today. All Claude calls run server-side; the browser never sees the key.
 
 ---
 
@@ -419,6 +430,6 @@ Judging: four criteria, **25% each**. This maps each feature to the criterion it
 
 ## 13. Stack (summary)
 
-Next.js (App Router, TypeScript) + Tailwind. **Live today:** TTS = ElevenLabs, Lyrics = Musixmatch, optional stem separation = LALAL.AI (or the user's own Soundberry stem service), and an in-memory session store synced via ~1s HTTP polling. **⏳ Planned:** Supabase (Postgres + Auth + RLS) for scores/challenges/leaderboards, and an LLM layer = Anthropic Claude (target `claude-opus-4-8`) for round generation / host banter / mood. Deploy on Replit (public demo URL).
+Next.js (App Router, TypeScript) + Tailwind. **Live today:** TTS = ElevenLabs (`eleven_multilingual_v2`, 29 narrator languages), Lyrics = Musixmatch, optional stem separation = LALAL.AI (or the user's own Soundberry stem service), an in-memory session store synced via ~1s HTTP polling, and Anthropic Claude (default `claude-opus-4-8`, raw `fetch`, no SDK) for **host-banter localization** into non-en/it languages. **⏳ Planned:** Supabase (Postgres + Auth + RLS) for scores/challenges/leaderboards, and extending the Claude layer to round generation and mood/theme. Deploy on Replit (public demo URL).
 
 Full setup and key-safety rules: [`README.md`](../README.md). Claude prompts P1–P6: [`PROMPTS.md`](./PROMPTS.md).

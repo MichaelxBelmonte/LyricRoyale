@@ -1,11 +1,8 @@
 # Soundclash Brand System
 
 Soundclash should feel like a premium Y2K music party object: a cassette, a J-card,
-a sticker sheet, and an arcade scoreboard collided into a fast social game.
-
-Reference mood board:
-
-`brand/ChatGPT Image Jun 18, 2026, 10_24_50 AM.png`
+a sticker sheet, and an arcade scoreboard collided into a fast social game. The shipped brand assets live in `public/brand/`
+(`logomark.png`, `wordmark.png`, `mascot.png`, `intro.mp4`).
 
 ## Brand Position
 
@@ -20,21 +17,34 @@ Reference mood board:
 
 ## Palette
 
-Use the palette as contrast blocks, not soft gradients everywhere.
+These are the actual tokens in `tailwind.config.ts`. The app renders on a warm
+light "editorial paper" canvas, not on black.
 
 | Token | Hex | Role |
 |---|---:|---|
-| Ink Black | `#0B0B0D` | App background, bezels, stage darkness |
-| Cream Tape Beige | `#FFF1D6` | J-card panels, lyric cards, tape labels |
-| Electric Tangerine | `#FF6A00` | Primary energy accent, side A, hot CTAs |
-| Hot Magenta | `#FF007F` | Main brand accent, active state, danger/tension |
-| Cyber Teal | `#00E5D2` | Timers, LED readouts, player/rival contrast |
-| Accent Yellow | `#FFD400` | Reward badges, sticker highlights |
-| Chrome Silver | `#E6E6E6` | Premium finish, buttons, metallic surfaces |
+| `ink` | `#15120E` | Primary text, dot-grid, bezels, dark panels |
+| `cream` | `#F4ECD8` | Tape-beige; same value as the `paper` canvas |
+| `brand` (`brand.500`) | `#C2563B` | Primary terracotta CTA, active state, danger/tension |
+| `tangerine` (`tangerine.500`) | `#D99A3C` | Secondary ochre accent, LED readouts, reward highlights |
+| `aqua` (`aqua.500`) | `#2E7D6B` | Teal contrast: links, player/rival, secondary hover |
+| `yellow` | `#ffd400` | Sticker/reward highlights |
+| `chrome` | `#aab0ba` | Metallic button finish (with `chrome.light`/`chrome.dark`) |
 
-Avoid returning to a generic dark SaaS palette. Black surfaces should feel like
-plastic, vinyl, CRT, or stage equipment; cream surfaces should feel like printed
-paper or tape labels.
+The `brand`, `tangerine`, and `aqua` families each ship 300/400/500/600 steps
+(`brand` adds a 700 `#7E3623`); `500` is the DEFAULT in every case.
+
+A separate `paper` token family defines the light surfaces:
+
+| Token | Hex | Role |
+|---|---:|---|
+| `paper` (DEFAULT) | `#F4ECD8` | App canvas |
+| `paper.raised` | `#FBF6EA` | Cards/panels lifted above the canvas |
+| `paper.sunken` | `#EADFC4` | Recessed secondary fills |
+| `paper.line` | `#E3D5B6` | Hairline borders |
+
+Use the palette as high-contrast blocks, not soft gradients everywhere. `ink`
+surfaces should feel like plastic, vinyl, CRT, or stage equipment; `paper`/`cream`
+surfaces should feel like printed paper or tape labels.
 
 ## Material Language
 

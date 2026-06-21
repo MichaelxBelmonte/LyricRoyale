@@ -22,7 +22,8 @@ I $100 di crediti coprono ampiamente una Reserved VM per tutto il periodo del co
    - `MXM_KEY` = chiave Musixmatch **(obbligatoria** — ricerca + testi)
    - `ELEVENLABS_API_KEY` (opzionale — voce host BEATBOT; senza, il gioco funziona, l'errore è gestito)
    - `ELEVENLABS_VOICE_HYPE` / `_JUDGE` / `_DIVA` (opzionali — id voce)
-   - `ANTHROPIC_API_KEY` (opzionale — non ancora usato)
+   - `ANTHROPIC_API_KEY` (opzionale — localizza il banter di BEATBOT nelle lingue del narratore diverse da `en`/`it`; senza, quelle lingue ripiegano sul pacchetto inglese e lo show gira lo stesso)
+   - `ANTHROPIC_BANTER_MODEL` (opzionale — override del modello, default `claude-opus-4-8`)
    - `LALAL_API_KEY` (opzionale)
    - *(più avanti, se aggiungi lo store)* `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`,
      `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
@@ -43,9 +44,10 @@ I $100 di crediti coprono ampiamente una Reserved VM per tutto il periodo del co
 ## Limite noto (in-memory)
 
 Su Reserved VM un **redeploy o un crash riavvia il processo → le stanze attive si perdono**.
-Per una demo dal vivo è irrilevante. Per robustezza durante la valutazione, sposta lo store
-sessioni su **Upstash Redis** (vedi piano): lo `session-store` userà Redis se le env
-`UPSTASH_REDIS_REST_*` sono presenti, altrimenti resta in-memory (fallback automatico).
+Per una demo dal vivo è irrilevante. Per robustezza durante la valutazione si può spostare lo store sessioni su uno store
+condiviso (**Upstash Redis** o Supabase). ⚠️ **Non ancora implementato**: oggi
+`lib/server/session-store.ts` è una semplice `Map` in-memory, senza alcun codice Redis.
+Va aggiunto a mano prima di poterci contare.
 
 ## Note Next.js
 

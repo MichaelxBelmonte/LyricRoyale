@@ -17,17 +17,18 @@ cyber teal, electric tangerine, LED scoreboards, stickers, and tape-label UI.
 
 ## Current Experience
 
-- Host creates a shared-screen room at `/host/new`.
+- Host creates a shared-screen room at `/host/new` and picks a **narrator language** (29 options).
 - Players join from `/join` or a room link on their phones.
-- Host can tap **Auto-pick show** once; the session then rotates a 6-round set.
+- Host can tap **Auto-pick show** once; the session then rotates a host-chosen **3-, 6-, or 9-round** set (default 6).
+- Host builds the track deck by **artist**, **genre**, or free-text **song** search.
 - Mini-games are mostly tap-based to keep phone input fast.
-- ElevenLabs voices handle room intro, round transitions, reveals, leaders, and final-score moments.
+- ElevenLabs voices handle room intro, round transitions, reveals, leaders, and final-score moments, in the chosen language.
 - A personalized ElevenLabs Music v2 signature powers the animated home waveform.
 - LALAL.AI split assets are kept for the upcoming Signal Check micro-game, but the home currently plays only the full mix.
 
 ## Mini-games
 
-The autopilot rotates a 6-round set drawn from this catalog (all lyric-based, mostly tap input):
+The autopilot rotates a host-chosen 3-, 6-, or 9-round set (default 6) drawn from this catalog (all lyric-based, mostly tap input):
 
 | Game | What you do |
 |---|---|
@@ -73,7 +74,7 @@ host picker for the pitch but never enters rotation.
 | ElevenLabs | AI host text-to-speech | Verified |
 | LALAL.AI | Stem separation lab | Wired |
 | Supabase | Persistence/realtime target | Planned for room hardening |
-| Anthropic Claude | Future host banter/mood/round generation | Planned |
+| Anthropic Claude | Host-banter localization (non-en/it narrator languages) | Wired |
 
 ## Status & known limitations
 
@@ -85,8 +86,12 @@ is live than overclaim — what's shipped today and what's intentionally still a
   store to Redis/Supabase (planned) is what enables persistence and multi-instance.
 - **No auth on the API routes.** Any client with the 4-char room code can drive the room.
   That's fine for a trusted in-person party/demo; host/player tokens are planned hardening.
-- **Host banter is template-driven.** Localized templates (`lib/game/host-banter.ts`)
-  voiced by ElevenLabs. Claude-generated banter/mood is planned, not yet wired.
+- **Host banter is template-driven, localized into 29 languages.** Templates live in
+  `lib/game/host-banter.ts`; English and Italian ship as hand-written static packs, and any
+  other narrator language is localized once by Claude (`lib/server/anthropic.ts`) and cached.
+  Without `ANTHROPIC_API_KEY` those non-en/it languages fall back to the English pack (the show
+  still runs — the chosen voice reads English text). Runtime values (names, guesses, room code)
+  are always interpolated in code; Claude only ever sees `{placeholder}` templates.
 - **Combo/Encore scoring** is live in solo mode; party rounds currently score base + speed
   (per-player streak wiring is in progress).
 
@@ -134,7 +139,9 @@ Soundclash is a standard Next.js server — deploy it to a **single always-on in
 - **Replit:** use a **Reserved VM** deployment — **not Autoscale** (sessions live in the
   server process; Autoscale's multiple instances would break room sharing).
 - **Build:** `npm run build` · **Run:** `npm run start` (binds `0.0.0.0:$PORT`).
-- **Secrets:** `MXM_KEY` (required) + optional `ELEVENLABS_API_KEY` / voice ids.
+- **Secrets:** `MXM_KEY` (required) + optional `ELEVENLABS_API_KEY` / voice ids; add
+  `ANTHROPIC_API_KEY` to localize the host banter into non-en/it narrator languages
+  (optional — en/it work without it, and others fall back to English).
 - Step-by-step: [`docs/DEPLOY_REPLIT.md`](./docs/DEPLOY_REPLIT.md).
 
 Once deployed you get a public HTTPS URL; the join QR/links resolve to it automatically,

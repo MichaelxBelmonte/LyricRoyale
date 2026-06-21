@@ -15,8 +15,8 @@ Implemented routes:
 | Route | Purpose |
 |---|---|
 | `/` | Branded Soundclash entry: cassette/J-card hero, create session, join session, or open the solo lab. |
-| `/host/new` | Creates a room and selects an initial ElevenLabs voice preset. |
-| `/host/[code]` | Shared-screen TV stage: join code, players, one seed track, autopilot mini-game set, round display, scoreboard. |
+| `/host/new` | Creates a room and selects an ElevenLabs voice preset and narrator language. |
+| `/host/[code]` | Shared-screen TV stage: join code, players, setlist deck, host-selected mini-game set, round display, scoreboard. |
 | `/join` | Phone join form; should become a compact J-card/tape-label screen. |
 | `/player/[code]` | Phone controller: tap answers, see locked state, personal score and round results. |
 | `/solo` | Existing single-player/ghost-duel lab kept for iteration. |
@@ -31,6 +31,8 @@ Implemented API surface:
 | `POST /api/sessions/[code]/join` | Join a room as a phone player. |
 | `POST /api/sessions/[code]/round` | Host starts or auto-advances a guided round from a Musixmatch track reference. |
 | `PATCH /api/sessions/[code]/round` | Player submits an answer; server validates and scores it. |
+| `GET /api/mxm/tracks` | Setlist sourcing: top tracks for an `artist` name or a `genreId`. |
+| `GET /api/mxm/genres` | Musixmatch genre list (server proxy). |
 
 The skeleton uses a server-side in-memory store in `lib/server/session-store.ts`.
 That is intentional for the first cut: it proves the room flow without adding
@@ -41,26 +43,43 @@ Supabase tables + Realtime Broadcast/Presence.
 
 The host should do as little as possible. The current room flow is:
 
-1. Host creates a room.
+1. Host creates a room and picks the host voice and narrator language.
 2. Players join from phones.
-3. Host either taps **Auto-pick show** or searches one artist/song and taps **Start show** once.
-4. The session rotates mini-games automatically for a 6-round set.
+3. Host builds a setlist (up to 8 tracks) by **artist**, **genre**, or **song**
+   search — curated quick-pick chips one-tap-load a deck, or **Surprise me** seeds
+   one — and selects which mini-games run.
+4. Host taps **Start show** once; the session rotates the chosen mini-games over a
+   host-selected set of **3, 6, or 9 rounds** (default 6).
 5. A round reveals automatically when every player answers, or when the timer expires.
 6. Results stay on screen briefly, then the next round starts automatically.
 
-Current automatic mini-games:
+Current automatic mini-games (the canonical catalog in `lib/session/mini-games.ts`):
 
-| Mini-game | Input | Data source |
-|---|---|---|
-| Finish the Line | Multiple choice | Musixmatch lyrics, server-side answer validation. |
-| The Drop | Multiple choice | Musixmatch lyrics + richsync timing when available, animated TV prompt. |
-| Next Line | Multiple choice | Musixmatch lyrics, deterministic line/options builder. |
-| Artist Lock | Multiple choice | Musixmatch lyrics + artist deck from the initial search. |
-| Word Rush | Multiple choice | Transient lyric keyword analysis, no lyric storage. |
-| Name That Song | Multiple choice | Musixmatch lyrics + track deck from the initial search. |
+| Mini-game | Category | Input | Data source |
+|---|---|---|---|
+| Finish the Line | Lyrics | Multiple choice | Musixmatch lyrics, server-side answer validation. |
+| Misheard | Lyrics | Multiple choice | Musixmatch lyrics, real line among generated mondegreens. |
+| Next Line | Lyrics | Multiple choice | Musixmatch lyrics, deterministic line/options builder. |
+| The Drop | Timing | Multiple choice | Musixmatch lyrics + richsync timing when available, animated TV prompt. |
+| On The Beat | Timing | Multiple choice | Musixmatch lyrics + richsync timing; lock the word on the beat, proximity scored. |
+| Word Rush | Timing | Multiple choice | Transient lyric keyword analysis, no lyric storage. |
+| Who Said It | Trivia | Multiple choice | Musixmatch lyrics + track deck from the setlist. |
+| Name That Song | Trivia | Multiple choice | Musixmatch lyrics + track deck from the setlist. |
+| Artist Lock | Trivia | Multiple choice | Musixmatch lyrics + artist deck from the setlist. |
+
+The host picks which of these run in the room; the session shuffles the chosen
+set into a rotation and draws from it without repeats within a cycle. The Drop
+and On The Beat need richsync timing and degrade gracefully when a track lacks
+it. Four façade-only "coming soon" cards (Stem Heist, Beat Roulette, Karaoke
+Clash, Rap Battle) appear in the gallery but never enter the rotation.
 
 The host voice is wired through ElevenLabs and can speak room intros, round
-transitions, reveal lines, leaders, and final-score moments.
+transitions, reveal lines, leaders, and final-score moments. The host picks one
+of 29 narrator languages at room creation (`lib/game/languages.ts`); the banter
+pack BEATBOT reads is localized into that language — English and Italian ship as
+built-in static packs, while any other language is generated once by Claude
+(`lib/server/anthropic.ts`) and cached, falling back to English if Claude is
+unavailable. The picked code is sent to ElevenLabs as `language_code`.
 
 The global soundtrack is also wired. A personalized ElevenLabs Music v2 signature
 with a short original vocal hook powers the home waveform:
@@ -97,7 +116,7 @@ only after the round resolves.
 
 | Surface | Endpoint | Notes |
 |---|---|---|
-| ElevenLabs host speech | `POST /api/host/speak` | Server-side TTS proxy. Accepts `text`, `preset`, optional `voiceId`, and returns `audio/mpeg`. |
+| ElevenLabs host speech | `POST /api/host/speak` | Server-side TTS proxy. Accepts `text`, `preset`, optional `voiceId`, optional `languageCode` (one of the 29 supported), and returns `audio/mpeg`. |
 | ElevenLabs soundtrack pack | `npm run soundtrack:generate` | Server-side Music v2 generation script. Writes reusable MP3 loops into `public/audio`; never runs on page load. |
 | ElevenLabs + LALAL signature | `npm run soundtrack:signature` | Generates `soundclash-signal-full.mp3`, uploads it to LALAL, then stores vocal/backing split assets. |
 | LALAL.AI stem split | `POST /api/lalal/stems` | Multipart audio upload. Uploads to LALAL v1 and starts a stem-separation task. |
@@ -119,7 +138,9 @@ secret audio is the extracted stem or the backing track.
 7. Promote the in-memory mini-game registry into a reusable module with tests.
 8. Add custom session voice flow with ElevenLabs IVC.
 9. Promote Stem Guess Lab into a multiplayer room mini-game.
-10. Replace search seeding with a guided artist/team setup that auto-builds the deck.
+
+Done since this plan was written: search seeding was replaced by guided setlist
+sourcing — the host builds the deck by artist, genre, or song search (item 10).
 
 ## LALAL.AI Mini-Game Ideas
 

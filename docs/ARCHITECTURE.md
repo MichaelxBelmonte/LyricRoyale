@@ -1,6 +1,6 @@
 # System Architecture
 
-> **Status — target vs. current build.** This document describes the *target* architecture, parts of which are not yet built. In particular, **Supabase (Postgres/Auth/RLS), leaderboards, all DB persistence, and Anthropic Claude (round generation, mood, host banter) are PLANNED, not implemented.** Likewise the routes `/api/round`, `/api/host`, `/api/mood`, `/api/challenge`, `/api/stems`, and the async `/c/[slug]` challenge flow do not exist yet. The current build uses an **in-memory session store** (`lib/server/session-store.ts`, a per-instance Map, no DB) synced via ~1s HTTP polling, and templated (non-LLM) host banter. For exactly what is live today, see the "Status & known limitations" section of [../README.md](../README.md).
+> **Status — target vs. current build.** This document describes the *target* architecture, parts of which are not yet built. In particular, **Supabase (Postgres/Auth/RLS), leaderboards, all DB persistence, and Claude-driven round generation and mood analysis are PLANNED, not implemented.** Likewise the routes `/api/round`, `/api/host` (note: `/api/host/speak` *does* exist), `/api/mood`, `/api/challenge`, `/api/stems`, and the async `/c/[slug]` challenge flow do not exist yet. The current build uses an **in-memory session store** (`lib/server/session-store.ts`, a per-instance Map, no DB) synced via ~1s HTTP polling. **One Claude use is live today:** host-banter *localization* (`lib/server/anthropic.ts`, raw `fetch` — no SDK) translates the BEATBOT banter pack into the host's chosen narrator language. English and Italian ship as static in-bundle packs (no Claude call); any other of the 29 supported languages is generated once by Claude and cached, and falls back to the English pack if `ANTHROPIC_API_KEY` is missing or the call fails. The banter *content* is still template-based (`{placeholder}` strings filled in code) — Claude only translates it; it does not generate rounds. For exactly what is live today, see the "Status & known limitations" section of [../README.md](../README.md).
 
 Soundclash is a web party game built on real song lyrics with an AI host, for the Musixmatch Musicathon 2026. This document describes how the system is structured: the trust boundary between the browser and the providers, the App Router folder layout, the end-to-end data flow for one round, room state, and the rationale behind each technology choice.
 
@@ -12,7 +12,7 @@ This is the engineering source of truth for *how the pieces fit together*. For *
 
 ## 1. High-Level Diagram
 
-Everything outbound to a third-party provider goes through the Next.js server. The browser never talks to Musixmatch, ElevenLabs, or LALAL.AI directly. (⏳ Planned: Claude as a fourth provider behind the same proxy.) In the target architecture the browser *does* talk to Supabase directly — but only through the publishable key, with Row-Level Security as the enforcement layer. **Today there is no Supabase and no Claude:** session state lives in an in-memory store on the server and host banter is templated, so the Supabase channel and the Claude box below are PLANNED.
+Everything outbound to a third-party provider goes through the Next.js server. The browser never talks to Musixmatch, ElevenLabs, Claude, or LALAL.AI directly. Claude is now a live (if narrow) fourth provider behind this proxy: it is called server-side from `lib/server/anthropic.ts` to localize host banter into non-English/Italian narrator languages (round generation and mood analysis via Claude remain ⏳ planned). In the target architecture the browser *does* talk to Supabase directly — but only through the publishable key, with Row-Level Security as the enforcement layer. **Today there is no Supabase:** session state lives in an in-memory store on the server, so the Supabase channel below is PLANNED.
 
 ```
                             ┌──────────────────────────────────────────────┐
@@ -54,7 +54,7 @@ Everything outbound to a third-party provider goes through the Next.js server. T
 
 | Channel | Who initiates | Auth | Used for | Status |
 |---|---|---|---|---|
-| Provider proxy | Browser → our server → provider | Server-side secrets in `process.env` | Lyrics, TTS, stems (Claude generation ⏳ planned) | Implemented (Claude ⏳ Planned) |
+| Provider proxy | Browser → our server → provider | Server-side secrets in `process.env` | Lyrics, TTS, stems, Claude banter localization (Claude round generation/mood ⏳ planned) | Implemented (Claude generation/mood ⏳ Planned) |
 | Supabase | Browser → Supabase (direct) | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` + RLS | Scores, challenges, leaderboards, profiles | ⏳ Planned |
 
 ---
@@ -78,13 +78,14 @@ Next.js treats any env var prefixed `NEXT_PUBLIC_` as inlined-into-the-client an
 | `MXM_KEY` | Server-only | Route handlers / server actions calling Musixmatch | Implemented |
 | `ELEVENLABS_API_KEY` | Server-only | Route handler calling ElevenLabs TTS (`xi-api-key` header) | Implemented |
 | `LALAL_API_KEY` | Server-only | Route handler calling LALAL.AI (optional, karaoke) | Implemented |
-| `ANTHROPIC_API_KEY` | Server-only | Server-side `@anthropic-ai/sdk` client | ⏳ Planned |
+| `ANTHROPIC_API_KEY` | Server-only | `lib/server/anthropic.ts` (raw `fetch` to the Messages API, no SDK) | Implemented (banter localization; needed only for non-en/it languages) |
+| `ANTHROPIC_BANTER_MODEL` | Server-only | `lib/server/anthropic.ts` — optional model override (default `claude-opus-4-8`) | Implemented (optional) |
 | `SUPABASE_DB_PASSWORD` | Server-only | Migrations / direct Postgres only — never at runtime in app code | ⏳ Planned |
 | `SUPABASE_PROJECT_REF` | Server-only | CLI / migrations tooling | ⏳ Planned |
 | `NEXT_PUBLIC_SUPABASE_URL` | Public | supabase-js in the browser | ⏳ Planned |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Public | supabase-js in the browser | ⏳ Planned |
 
-⏳ Planned: only the two `NEXT_PUBLIC_SUPABASE_*` values will reach the browser. They are *designed* to be public: the publishable key grants nothing on its own — Row-Level Security on every table is what actually authorizes reads and writes. (None of the Supabase or Anthropic variables are used in the current build.)
+⏳ Planned: only the two `NEXT_PUBLIC_SUPABASE_*` values will reach the browser. They are *designed* to be public: the publishable key grants nothing on its own — Row-Level Security on every table is what actually authorizes reads and writes. (None of the Supabase variables are used in the current build. `ANTHROPIC_API_KEY` *is* now read server-side by the banter-localization path; the rest of the planned Claude usage — round generation, mood — is not wired up.)
 
 ### Secret hygiene
 
@@ -144,7 +145,9 @@ soundclash/
 │     ├─ mxm/
 │     │  ├─ search/route.ts      # GET: Musixmatch track.search (proxy)
 │     │  ├─ track/route.ts       # GET: Musixmatch track + lyrics (proxy)
-│     │  └─ richsync/route.ts    # GET: Musixmatch richsync (proxy)
+│     │  ├─ richsync/route.ts    # GET: Musixmatch richsync (proxy)
+│     │  ├─ genres/route.ts      # GET: Musixmatch music.genres.get (proxy)
+│     │  └─ tracks/route.ts      # GET: setlist by ?artist= or ?genreId= (track.search)
 │     ├─ host/
 │     │  └─ speak/route.ts       # POST: ElevenLabs TTS (audio)
 │     ├─ lalal/
@@ -176,13 +179,15 @@ soundclash/
 │
 ├─ lib/
 │  ├─ server/                    # SERVER-ONLY. Imports secrets. Never imported by a client component.
-│  │  ├─ musixmatch.ts           # track.search / track + lyrics / richsync (MXM_KEY)
+│  │  ├─ musixmatch.ts           # search / track+lyrics / richsync / genres / artist+genre tracks (MXM_KEY)
 │  │  ├─ elevenlabs.ts           # TTS POST /v1/text-to-speech/{voice_id} (composeMusic unused)
+│  │  ├─ anthropic.ts            # resolveBanterPack(): localize host banter via Claude (raw fetch, ANTHROPIC_API_KEY)
 │  │  ├─ lalal.ts                # stem separation (optional)
 │  │  └─ session-store.ts        # in-memory active-session store (module-global Map, no DB)
 │  │
-│  ├─ game/                      # artists, challenge, finish-line, host-banter (templates),
-│  │                             #   identity, scoring
+│  ├─ game/                      # artists (+ curated genres), challenge, finish-line,
+│  │                             #   host-banter (data-driven {placeholder} packs, en/it static),
+│  │                             #   languages (29 narrator languages), identity, scoring
 │  ├─ session/                   # mini-games (9), avatars, types
 │  ├─ audio/                     # soundtrack
 │  ├─ i18n.ts
@@ -202,14 +207,14 @@ soundclash/
    └─ PROMPTS.md
 ```
 
-> ⏳ **Planned, not yet present:** `lib/client/supabase.ts` (browser supabase-js), `lib/server/claude.ts` + `lib/server/supabase-admin.ts`, `lib/prompts/` (Claude prompts P1–P6), `supabase/migrations/` (SQL + RLS), and the `app/play/[gameId]`, `app/c/[slug]`, `app/leaderboard` routes. There is currently **no** `@supabase` or `@anthropic-ai` dependency in `package.json`.
+> ⏳ **Planned, not yet present:** `lib/client/supabase.ts` (browser supabase-js), `lib/server/claude.ts` (the round-generation/mood Claude client — distinct from the live banter-localization module `lib/server/anthropic.ts`) + `lib/server/supabase-admin.ts`, `lib/prompts/` (Claude prompts P1–P6), `supabase/migrations/` (SQL + RLS), and the `app/play/[gameId]`, `app/c/[slug]`, `app/leaderboard` routes. There is currently **no** `@supabase` or `@anthropic-ai` dependency in `package.json` — the live Claude call is a raw `fetch`.
 
 **Conventions:**
 
 - `app/api/*/route.ts` route handlers and inline server actions are the *only* code that reads provider secrets.
 - `lib/server/*` is the shared implementation those handlers call; it is server-only by construction and never reaches a `"use client"` module.
 - ⏳ Planned: `lib/client/supabase.ts` will be the single browser Supabase entry point and touch only `NEXT_PUBLIC_*`.
-- ⏳ Planned: `lib/prompts/*` will hold the strict-JSON Claude prompts; their full text lives in [PROMPTS.md](./PROMPTS.md). Today, host banter is templated, non-LLM strings in `lib/game/host-banter.ts`.
+- ⏳ Planned: `lib/prompts/*` will hold the strict-JSON Claude prompts for round generation/mood; their full text lives in [PROMPTS.md](./PROMPTS.md). Today, host banter is template strings (`{placeholder}` packs) in `lib/game/host-banter.ts`; runtime values are filled in code, and Claude is used only to *translate* the pack into non-en/it narrator languages (`lib/server/anthropic.ts`).
 
 ---
 
@@ -466,7 +471,7 @@ The state strategy follows the server-authoritative nature of the game. There is
 | **Next.js (App Router, TypeScript)** | Route handlers and server actions give us a first-class server tier in the same project as the UI — exactly what the proxy pattern needs. The `NEXT_PUBLIC_` convention makes the secret boundary explicit and enforceable. TypeScript lets the canonical `Round` shape be a real type shared across server and client. |
 | **Tailwind** | Fast, consistent styling for a game UI under a 5-day deadline; no separate design system to build. |
 | **Supabase (Postgres + Auth + RLS)** — ⏳ Planned | One managed service covers the database, authentication, and authorization. RLS lets the browser talk to the DB directly with the publishable key without trusting the client — the database enforces who can read/write what. Anonymous challenge guests (`anon_name`) and authed players (`profiles`) coexist under one policy model. *Not yet adopted: no `@supabase` dependency; persistence is currently the in-memory session store.* |
-| **Anthropic Claude (`claude-opus-4-8`)** — ⏳ Planned | Intended to drive live round generation (P1–P3), the mood/theme analysis that replaces the 403 Musixmatch endpoint (P4), and the host persona + banter (P5–P6), all returning strict JSON, called server-side via `@anthropic-ai/sdk` so `ANTHROPIC_API_KEY` never reaches the browser. *Not yet adopted: no `@anthropic-ai/sdk` dependency. Host banter currently uses localized string templates in `lib/game/host-banter.ts` (not an LLM); rounds come from `lib/session/mini-games.ts`.* |
+| **Anthropic Claude (`claude-opus-4-8`)** — partly live | **Live today:** host-banter *localization*. `lib/server/anthropic.ts` (`resolveBanterPack`) calls the Messages API with a structured-outputs JSON schema to translate the BEATBOT banter pack into the host's chosen narrator language, server-side so `ANTHROPIC_API_KEY` never reaches the browser. The call is a raw `fetch` (no `@anthropic-ai/sdk` dependency); the model defaults to `claude-opus-4-8` and can be overridden with `ANTHROPIC_BANTER_MODEL`. English/Italian are static in-bundle packs (no Claude); generated packs are cached module-global; on any failure (missing key, non-200, refusal, parse error) it falls back to the English pack. **⏳ Still planned:** Claude-driven round generation (P1–P3), the mood/theme analysis that would replace the 403 Musixmatch endpoint (P4), and richer host persona/banter generation (P5–P6). Rounds still come from `lib/session/mini-games.ts` + deterministic logic, not Claude. |
 | **ElevenLabs (TTS)** | The AI emcee's voice. Verified working: `POST /v1/text-to-speech/{voice_id}` returns `200 audio/mpeg`, auth via the `xi-api-key` header, on the creator tier (~131k credits). Selectable personalities map to different voices/prompts. Called only server-side. |
 | **Musixmatch (lyrics)** | The sponsor API and the heart of the game. Verified live: `track.search`, `track.lyrics.get` (full lyrics, not truncated), `track.subtitle.get` (line-level synced), `track.richsync.get` (word-level synced), and `matcher.track.get` all return 200. `track.lyrics.mood.get` is 403 on our key — handled by deriving mood with Claude. Heavy Musixmatch use directly serves the "Use of Musixmatch API" judging criterion. |
 | **LALAL.AI (optional)** | Stem separation for the karaoke stretch goal (vocal stem for pitch tracking), or the developer's own Soundberry stem service as an alternative. Optional and server-side only. |

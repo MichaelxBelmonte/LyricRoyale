@@ -20,15 +20,19 @@ The `docs/` folder is the **single source of truth**. Read these first, then fol
 If the docs are ambiguous, follow them and flag the ambiguity. If two docs conflict, **stop and ask** — never guess silently.
 
 ## 1. The product
-A browser party game built on **real song lyrics** with an **AI host**. One device hosts the room, players join on phones, and BEATBOT runs a mostly automatic 6-round lyric show. Current modes: **finish_line, the_drop, next_line, artist_pick, word_rush, name_song**. Differentiator: cassette/Y2K brand, AI-host personality, lyric-centric gameplay, and a Jackbox-style zero-install room loop.
+A browser party game built on **real song lyrics** with an **AI host**. One device hosts the room, players join on phones, and BEATBOT runs a mostly automatic lyric show of host-chosen length (**3, 6, or 9 rounds**; default 6). Current modes (9 live): **finish_line, mondegreen, the_drop, on_beat, song_mash, next_line, name_song, artist_pick, word_rush**. Differentiator: cassette/Y2K brand, AI-host personality, lyric-centric gameplay, and a Jackbox-style zero-install room loop.
 
 ## 2. Stack & infra
-Next.js (App Router, TypeScript) + Tailwind · in-memory room store now, Supabase Realtime/Postgres later · deploy on **Replit** or another public URL. TTS = **ElevenLabs**. Lyrics = **Musixmatch**. Stem separation = **LALAL.AI**. Claude is planned for richer host banter and mood-aware direction.
+Next.js (App Router, TypeScript) + Tailwind · in-memory room store now, Supabase Realtime/Postgres later · deploy on **Replit** or another public URL. TTS = **ElevenLabs**. Lyrics = **Musixmatch**. Stem separation = **LALAL.AI**. Claude (Anthropic Messages API, raw `fetch` — no SDK) localizes the BEATBOT host "banter pack" into non-`en`/`it` narrator languages.
 
 ## 3. Environment (already in `.env.local`, gitignored — never print, log, or commit)
 - **Server-side secrets:** `MXM_KEY`, `ELEVENLABS_API_KEY`, `ANTHROPIC_API_KEY`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_REF`
+- **Optional:** `ANTHROPIC_BANTER_MODEL` — overrides the banter model (default `claude-opus-4-8`). `ANTHROPIC_API_KEY` is needed **only** to localize non-`en`/`it` narrator languages; without it those languages fall back to the English banter pack (the show still runs).
 - **Public (browser-safe):** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - Supabase `project_ref`: keep it in `.env.local` / deployment secrets only.
+
+## 3a. Narrator languages & host banter (implemented)
+The host picks one of **29 narrator languages** at room creation (`lib/game/languages.ts` `SUPPORTED_LANGUAGES`, the ElevenLabs `eleven_multilingual_v2` set; `DEFAULT_LANGUAGE = "en"`). The picked code is stored on the session as `narratorLang` and sent to ElevenLabs as `language_code` on every TTS call (`lib/server/elevenlabs.ts`). BEATBOT's lines come from a localized **banter pack**: `en`/`it` use hand-written static packs that ship in-bundle (`lib/game/host-banter.ts`), every other language is generated **once** by Claude and cached module-global, with field-by-field fallback to the English pack if Claude is unavailable. Entry point: `resolveBanterPack(code, nativeName)` in `lib/server/anthropic.ts`. Runtime values (player names, guesses, solutions) are interpolated **in code** via `fill()` — Claude only ever sees/returns `{placeholder}` templates, never live session data.
 
 ## 4. Verified API status (already tested — do not re-discover)
 Musixmatch (live key): `track.search` ✅ · `track.lyrics.get` ✅ (FULL text) · `track.subtitle.get` ✅ (line sync) · `track.richsync.get` ✅ (WORD sync, shape `{ ts, te, x, l:[{ c, o }] }`) · `matcher.track.get` ✅ · `track.lyrics.mood.get` ❌ **403** → derive mood/theme with Claude (PROMPTS.md **P4**). ElevenLabs ✅ TTS (tier creator, ~131k credits, header `xi-api-key`).
