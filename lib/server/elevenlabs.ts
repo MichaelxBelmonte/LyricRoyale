@@ -102,6 +102,47 @@ export async function createSpeech(input: SpeechInput): Promise<Response> {
   return response;
 }
 
+export interface VoiceCloneResult {
+  voiceId: string;
+  requiresVerification: boolean;
+}
+
+// Instant Voice Cloning (IVC): near-instant, no training. The sample conditions
+// the voice at inference. Used by Voice Clash to clone the HOST's own voice (with
+// in-app consent); the clone is deleted at match end. `requires_verification`
+// mirrors ElevenLabs' voice-captcha — the voice is still usable for TTS meanwhile.
+export async function cloneInstantVoice(
+  name: string,
+  sample: Blob,
+  filename = "sample.webm",
+): Promise<VoiceCloneResult> {
+  const form = new FormData();
+  form.append("name", name.trim().slice(0, 60) || "Soundclash host");
+  form.append("remove_background_noise", "true");
+  form.append("files", sample, filename);
+  // No explicit Content-Type — fetch sets the multipart boundary for FormData.
+  const response = await fetch(`${BASE}/voices/add`, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey() },
+    body: form,
+    cache: "no-store",
+  });
+  if (!response.ok) throw new ElevenLabsProviderError(`ElevenLabs IVC HTTP ${response.status}`);
+  const data = (await response.json()) as { voice_id?: string; requires_verification?: boolean };
+  if (!data.voice_id) throw new ElevenLabsProviderError("ElevenLabs IVC: no voice_id returned");
+  return { voiceId: data.voice_id, requiresVerification: Boolean(data.requires_verification) };
+}
+
+// Privacy teardown: purge a cloned voice from the ElevenLabs account. Best-effort.
+export async function deleteVoice(voiceId: string): Promise<void> {
+  if (!voiceId) return;
+  await fetch(`${BASE}/voices/${encodeURIComponent(voiceId)}`, {
+    method: "DELETE",
+    headers: { "xi-api-key": apiKey() },
+    cache: "no-store",
+  }).catch(() => {});
+}
+
 export async function composeMusic(input: MusicInput): Promise<Response> {
   const prompt = input.prompt.trim().slice(0, 4100);
   if (!prompt) throw new ElevenLabsProviderError("Music prompt is required");

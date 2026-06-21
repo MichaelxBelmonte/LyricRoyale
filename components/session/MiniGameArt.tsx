@@ -34,6 +34,15 @@ const ART: Record<MiniGameId, ReactNode> = {
       <path d="M18 36q8-14 16 0t16 0 16 0 16 0" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
     </>
   ),
+  // Voice Clash — a mic with broadcast waves: the crowd rates the track.
+  voice_clash: (
+    <>
+      <rect x="52" y="16" width="16" height="26" rx="8" fill="none" stroke="currentColor" strokeWidth="2.5" />
+      <path d="M46 38a14 14 0 0 0 28 0" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M60 52v8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M30 30q-6 6 0 12M90 30q6 6 0 12" fill="none" stroke={FAINT} strokeWidth="3" strokeLinecap="round" />
+    </>
+  ),
   // Finish the Line — lyric bars with the last word as a blank.
   finish_line: (
     <>

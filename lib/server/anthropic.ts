@@ -137,6 +137,205 @@ async function generateBanterPack(nativeName: string): Promise<BanterPack | null
   }
 }
 
+export interface BarsInput {
+  theme: string;
+  vibe: string;
+  players: string[];
+  /** Native language name for the bars (defaults to English). */
+  nativeName?: string;
+}
+
+// A short, punchy fallback so Voice Clash always has something to perform even
+// without an Anthropic key.
+function fallbackBars(input: BarsInput): string {
+  const who = input.players.slice(0, 2).join(" and ") || "the whole room";
+  return `Yo, it's ${input.vibe} in the building tonight — ${input.theme}! Shout out to ${who}, we don't miss, we levitate. Soundclash on the mic, let's elevate!`;
+}
+
+/**
+ * Write 4-6 short rap/spoken bars for Voice Clash about a theme, in a vibe, name-
+ * dropping a couple of players. Plain text (read aloud by TTS in the host's cloned
+ * voice). Falls back to a templated line if Claude is unavailable. Kept under ~380
+ * chars so it fits the TTS request and performs in ~20s.
+ */
+export async function writeBars(input: BarsInput): Promise<string> {
+  const key = apiKey();
+  if (!key) return fallbackBars(input);
+  const lang = input.nativeName?.trim() || "English";
+  const players = input.players.slice(0, 6).join(", ") || "the crowd";
+  const prompt = [
+    `Write 4 to 6 short rap bars in ${lang} for a party game host to perform over a ${input.vibe} beat.`,
+    `Theme: ${input.theme}. People in the room: ${players}.`,
+    "Make it playful, hype, and clean (no slurs/profanity). Punchy internal rhyme is great.",
+    "Return ONLY the bars as plain text separated by newlines — no title, no quotes, no commentary.",
+    "Hard limit: 380 characters total.",
+  ].join("\n");
+  try {
+    const response = await fetch(`${BASE}/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: model(),
+        max_tokens: 400,
+        messages: [{ role: "user", content: prompt }],
+      }),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      console.error("[anthropic.bars]", { status: response.status });
+      return fallbackBars(input);
+    }
+    const data = (await response.json()) as {
+      stop_reason?: string;
+      content?: { type: string; text?: string }[];
+    };
+    if (data.stop_reason === "refusal") return fallbackBars(input);
+    const text = data.content?.find((block) => block.type === "text")?.text?.trim();
+    return text && text.length > 0 ? text.slice(0, 400) : fallbackBars(input);
+  } catch (err) {
+    console.error("[anthropic.bars]", { message: err instanceof Error ? err.message : "unknown" });
+    return fallbackBars(input);
+  }
+}
+
+// Logical lyric distractors. The local heuristics pick near-miss WORDS that are
+// unrelated to the sentence, so the right answer is obvious. Claude instead writes
+// wrong options that actually FIT the line (grammar, meaning, rhyme) and are
+// tempting. Lower-latency model by default (per-round, on the critical path).
+function choicesModel(): string {
+  return process.env.ANTHROPIC_CHOICES_MODEL?.trim() || "claude-sonnet-4-6";
+}
+
+const CHOICES_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["distractors"],
+  properties: {
+    distractors: { type: "array", items: { type: "string", minLength: 1 } },
+  },
+} as const;
+
+export type LyricGame = "finish_line" | "next_line" | "mondegreen";
+
+export interface LyricChoicesInput {
+  game: LyricGame;
+  /** finish_line: the full lyric line · next_line: the preceding line · mondegreen: the real line. */
+  line: string;
+  /** finish_line: the missing last word · next_line: the real next line · mondegreen: the real line. */
+  answer: string;
+  /** How many wrong options to return. */
+  count: number;
+}
+
+const globalForChoices = globalThis as typeof globalThis & {
+  __soundclashChoices?: Map<string, string[]>;
+};
+const choicesCache: Map<string, string[]> = globalForChoices.__soundclashChoices ?? new Map();
+globalForChoices.__soundclashChoices = choicesCache;
+
+function normForKey(value: string): string {
+  return value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+function choicesPrompt(input: LyricChoicesInput): string {
+  const n = input.count;
+  if (input.game === "finish_line") {
+    return [
+      "You design TEMPTING wrong answers for a music lyrics game.",
+      `Lyric line: "${input.line}"`,
+      `Its FINAL word, "${input.answer}", is the correct answer players must guess.`,
+      `Give exactly ${n} alternative final words that could BELIEVABLY end this line: same language as the lyric, same part of speech, similar length, plausible rhyme/rhythm and meaning — but WRONG.`,
+      "They must be tempting and on-topic — never random, nonsensical, or from another language. Single words, no punctuation. Do NOT include the correct word.",
+    ].join("\n");
+  }
+  if (input.game === "next_line") {
+    return [
+      'You design tempting wrong answers for a "guess the next line" music game.',
+      `Given line: "${input.line}"`,
+      `The REAL next line is: "${input.answer}"`,
+      `Give exactly ${n} FAKE next lines: plausible continuations in the SAME language, style, syllable count and rhyme feel as the real one — coherent and tempting, but not the real line. No surrounding quotes.`,
+    ].join("\n");
+  }
+  return [
+    'You create "mondegreens" (misheard lyrics) for a music game.',
+    `Real lyric line: "${input.answer}"`,
+    `Give exactly ${n} mondegreens: versions that sound phonetically similar when sung but use different words (ideally a little funny). Same language, similar length, clearly different meaning, believable mishearings. No surrounding quotes.`,
+  ].join("\n");
+}
+
+/**
+ * Ask Claude for context-plausible wrong options for a lyrics round. Returns the
+ * distractors (NOT including the answer) or null on any failure/timeout, so the
+ * caller can fall back to the local heuristic. Cached per (game, line, answer).
+ */
+export async function generateLyricChoices(input: LyricChoicesInput): Promise<string[] | null> {
+  const key = apiKey();
+  if (!key || input.count < 1) return null;
+  const cacheKey = `${input.game}:${normForKey(input.line)}:${normForKey(input.answer)}:${input.count}`;
+  const cached = choicesCache.get(cacheKey);
+  if (cached) return cached;
+
+  const controller = new AbortController();
+  // Generous enough for a fresh call (~2-4s observed); cache makes repeats instant,
+  // and a timeout simply falls back to the local heuristic options.
+  const timer = setTimeout(() => controller.abort(), 4500);
+  try {
+    const response = await fetch(`${BASE}/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: choicesModel(),
+        max_tokens: 400,
+        output_config: { format: { type: "json_schema", schema: CHOICES_SCHEMA } },
+        messages: [{ role: "user", content: choicesPrompt(input) }],
+      }),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      console.error("[anthropic.choices]", { status: response.status });
+      return null;
+    }
+    const data = (await response.json()) as {
+      stop_reason?: string;
+      content?: { type: string; text?: string }[];
+    };
+    if (data.stop_reason === "refusal") return null;
+    const text = data.content?.find((block) => block.type === "text")?.text;
+    if (!text) return null;
+    const parsed = JSON.parse(text) as { distractors?: unknown };
+    const seen = new Set<string>([normForKey(input.answer)]);
+    const out: string[] = [];
+    for (const raw of Array.isArray(parsed.distractors) ? parsed.distractors : []) {
+      if (typeof raw !== "string") continue;
+      const trimmed = raw.trim().replace(/^["']+|["']+$/g, "");
+      const norm = normForKey(trimmed);
+      if (!trimmed || !norm || seen.has(norm)) continue;
+      seen.add(norm);
+      out.push(trimmed);
+    }
+    if (out.length < input.count) return null;
+    const result = out.slice(0, input.count);
+    choicesCache.set(cacheKey, result);
+    return result;
+  } catch (err) {
+    if (!(err instanceof Error && err.name === "AbortError")) {
+      console.error("[anthropic.choices]", { message: err instanceof Error ? err.message : "unknown" });
+    }
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Resolve the host-narrator banter pack for a language. English/Italian use the
  * built-in static packs (instant, deterministic). Any other supported language

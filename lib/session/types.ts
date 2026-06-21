@@ -17,9 +17,14 @@ export type MiniGameId =
   | "genre_roulette"
   | "beat_lock"
   // Real-song stem game (host-uploaded audio separated via lalal.ai).
-  | "stem_heist";
+  | "stem_heist"
+  // Host clones their voice → app bakes a track (voice over a generated beat) →
+  // the crowd rates it. Uses the "judge" answer type. ElevenLabs IVC + Music + TTS.
+  | "voice_clash";
 export type HostVoicePreset = "hype" | "judge" | "diva" | "custom";
-export type RoundAnswerType = "text" | "choice" | "tap";
+// "judge" = subjective crowd rating (0..100 / stars). No correct answer; the
+// track's score is the aggregate of player ratings (see Voice Clash).
+export type RoundAnswerType = "text" | "choice" | "tap" | "judge";
 
 export interface SessionTrackRef {
   trackId: number;
@@ -35,6 +40,31 @@ export interface TrackStem {
   stem: string;
   url: string;
   trackName: string;
+}
+
+// A baked Voice Clash track: the host's cloned voice (spoken/rap bars) over a
+// freshly generated instrumental. Both audio parts are served from the in-memory
+// store via /api/sessions/[code]/voice. The crowd rates the finished track.
+export interface VoiceTrack {
+  id: number;
+  vibe: string;
+  lyric: string;
+  /** URL of the generated instrumental bed. */
+  beatUrl: string;
+  /** URL of the host-voice vocal (TTS in the cloned voice). */
+  vocalUrl: string;
+  /** Player who authored the theme/lyric, if any (excluded from rating their own). */
+  creatorPlayerId?: string;
+  creatorName?: string;
+}
+
+// The host's instant voice clone for this session (ElevenLabs IVC). Deleted at
+// match end / teardown for privacy. `requiresVerification` mirrors ElevenLabs'
+// voice-captcha flag; the clone is still usable for TTS while it clears.
+export interface VoiceClone {
+  voiceId: string;
+  label: string;
+  requiresVerification: boolean;
 }
 
 export interface HostVoiceConfig {
@@ -85,6 +115,12 @@ export interface SessionRound {
   // Beat Lock: target tempo + the on-beat tap tolerance (ms), both tier-scaled.
   bpm?: number;
   tapWindowMs?: number;
+  // Voice Clash (judge round): the host-voice vocal played over `audioUrl`, the
+  // lyric shown karaoke-style, the track's author, and the crowd score at reveal.
+  vocalUrl?: string;
+  lyric?: string;
+  creatorPlayerId?: string;
+  studioScore?: number;
   solution?: string;
   copyright?: string;
   tracking?: TrackingLinks;
@@ -122,6 +158,10 @@ export interface PartySession {
   // Prepared isolated stems per deck trackId (host Stem Lab → lalal.ai). Powers
   // Stem Heist, which is only playable once >=4 are ready.
   trackStems: Record<number, TrackStem>;
+  // Voice Clash: the host's instant voice clone + the tracks baked from it. The
+  // game is only playable once a clone exists and >=1 track is baked.
+  voiceClone: VoiceClone | null;
+  voiceTracks: VoiceTrack[];
   autopilot: boolean;
   trackPool: SessionTrackRef[];
   players: SessionPlayer[];
@@ -132,6 +172,16 @@ export interface PartySession {
 
 export interface PublicSessionState extends PartySession {
   playerCount: number;
+  // Server-side capability flags so the host UI can gate the setup flow (which
+  // games are playable, what content to prepare) without a round-trip.
+  capabilities: {
+    /** ELEVENLABS_API_KEY present → Genre Roulette / Beat Lock can generate audio. */
+    audioGen: boolean;
+    /** LALAL_API_KEY present → Stem Heist can prepare stems. */
+    stemSeparation: boolean;
+    /** ELEVENLABS_API_KEY present → Voice Clash can clone the host voice + bake tracks. */
+    voiceClone: boolean;
+  };
 }
 
 export interface CreateSessionInput {

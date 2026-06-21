@@ -10,6 +10,7 @@ import JoinQr from "@/components/session/JoinQr";
 import MiniGameArt from "@/components/session/MiniGameArt";
 import MusicPicker from "@/components/session/MusicPicker";
 import StemLab from "@/components/session/StemLab";
+import VoiceStudio from "@/components/session/VoiceStudio";
 import { MusixmatchTracking } from "@/components/session/MusixmatchTracking";
 import Avatar from "@/components/ui/Avatar";
 import Icon from "@/components/ui/Icon";
@@ -27,8 +28,12 @@ import {
   ALL_MINI_GAME_IDS,
   CATEGORY_META,
   COMING_SOON_GAMES,
+  gameBlockers,
   MINI_GAME_CATALOG,
   MINI_GAME_CATEGORIES,
+  needsHostVoice,
+  needsLyricsDeck,
+  onlyGenerated,
   orderMiniGames,
 } from "@/lib/session/mini-games";
 import type { HostVoicePreset, MiniGameId, PublicSessionState } from "@/lib/session/types";
@@ -43,8 +48,18 @@ const SETUP_STEPS = [
 ];
 type SetupStep = (typeof SETUP_STEPS)[number]["id"];
 
-// A balanced one-tap starter: one game per category.
-const QUICK_SET: MiniGameId[] = ["finish_line", "the_drop", "song_mash"];
+// A balanced one-tap starter: one game per category (all from the live catalog).
+const QUICK_SET: MiniGameId[] = ["finish_line", "genre_roulette", "beat_lock"];
+
+// Stand-in "track" for generated-only shows (Genre Roulette / Beat Lock make their
+// own audio, so there is no Musixmatch deck). The seed still varies per round.
+const GENERATED_PLACEHOLDER: TrackSummary = {
+  trackId: 1,
+  trackName: "Generated bed",
+  artistName: "BEATBOT",
+  hasLyrics: false,
+  hasRichsync: false,
+};
 
 // Card styling per category tone — accent line color, banner wash, selected ring,
 // category tag, and the check badge. Keeps the JSX tidy and on-brand.
@@ -468,6 +483,28 @@ export default function HostRoom({ code }: { code: string }) {
     );
   }
 
+  // ---- Setup readiness (drives the conditional Music step + Start gate) ------
+  const selectedGames = session?.miniGames ?? [];
+  const lyricsNeeded = needsLyricsDeck(selectedGames);
+  const generatedOnly = onlyGenerated(selectedGames);
+  const voiceNeeded = needsHostVoice(selectedGames);
+  const preparedStems = session ? Object.keys(session.trackStems).length : 0;
+  const voiceTrackCount = session?.voiceTracks?.length ?? 0;
+  const blockers = session
+    ? gameBlockers(selectedGames, {
+        deckCount: deck.length,
+        preparedStems,
+        voiceTracks: voiceTrackCount,
+        voiceCloned: Boolean(session.voiceClone),
+        // Capabilities default to true if an older session payload lacks the field.
+        audioGen: session.capabilities?.audioGen ?? true,
+        stemSeparation: session.capabilities?.stemSeparation ?? true,
+      })
+    : [];
+  const canStart = blockers.length === 0;
+  // Deduped, human-readable blocker reasons for the Start banner.
+  const blockerReasons = Array.from(new Set(blockers.map((b) => b.reason)));
+
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-7xl flex-col px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-black/10 pb-5 lg:shrink-0">
@@ -580,7 +617,7 @@ export default function HostRoom({ code }: { code: string }) {
                   onClick={() => void configureGames(ALL_MINI_GAME_IDS)}
                   className="rounded-full border border-black/10 px-3 py-2 font-mono text-[0.6rem] uppercase tracking-[0.16em] text-black/70 transition-colors hover:border-aqua hover:text-aqua"
                 >
-                  All 9
+                  All {MINI_GAME_CATALOG.length}
                 </button>
                 <button
                   type="button"
@@ -760,7 +797,12 @@ export default function HostRoom({ code }: { code: string }) {
                     {session.miniGames.length} {session.miniGames.length === 1 ? "game" : "games"}
                   </p>
                 </div>
-                <Button onClick={() => setSetupStep("artists")}>Next · Artists →</Button>
+                {/* Skip the Music step entirely when no game needs a Musixmatch deck. */}
+                {lyricsNeeded ? (
+                  <Button onClick={() => setSetupStep("artists")}>Next · Music →</Button>
+                ) : (
+                  <Button onClick={() => setSetupStep("lobby")}>Next · Lobby →</Button>
+                )}
               </div>
             </section>
           ) : null}
@@ -773,31 +815,47 @@ export default function HostRoom({ code }: { code: string }) {
                 </Sticker>
                 <div className="min-w-0">
                   <p className="font-condensed text-xl uppercase leading-tight tracking-[0.02em] text-ink">
-                    Pick the music
+                    {lyricsNeeded ? "Pick the music" : "No tracks needed"}
                   </p>
                   <p className="text-xs text-black/45">
-                    Add tracks by artist, genre, or song. BEATBOT draws from these each round.
+                    {lyricsNeeded
+                      ? "Add tracks by artist, genre, or song. BEATBOT draws from these each round."
+                      : "Your games make their own audio — there's nothing to pick here."}
                   </p>
                 </div>
-                <span className="ml-auto rounded-full border border-aqua/40 bg-aqua/10 px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-[0.16em] text-aqua">
-                  {deck.length}/8 tracks
-                </span>
+                {lyricsNeeded ? (
+                  <span className="ml-auto rounded-full border border-aqua/40 bg-aqua/10 px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-[0.16em] text-aqua">
+                    {deck.length}/8 tracks
+                  </span>
+                ) : null}
               </div>
 
-              <div className="mt-4">
-                <MusicPicker
-                  deck={deck}
-                  selectedGames={session?.miniGames ?? []}
-                  onToggle={toggleDeck}
-                  onAddMany={addManyToDeck}
-                />
-              </div>
+              {lyricsNeeded ? (
+                <div className="mt-4">
+                  <MusicPicker
+                    deck={deck}
+                    selectedGames={selectedGames}
+                    onToggle={toggleDeck}
+                    onAddMany={addManyToDeck}
+                  />
+                </div>
+              ) : (
+                <div className="mt-4 rounded-xl border border-dashed border-black/15 bg-black/[0.02] p-5">
+                  <p className="text-sm leading-6 text-black/60">
+                    {generatedOnly
+                      ? "Genre Roulette and Beat Lock generate an original instrumental every round — head to the lobby and start."
+                      : voiceNeeded
+                        ? "Voice Clash makes a track from your cloned voice over a generated beat — set it up in the Voice Studio in the lobby. No Musixmatch tracks needed."
+                        : "Stem Heist plays host-prepared audio. Prepare it in the Stem Lab in the lobby; no Musixmatch tracks are required."}
+                  </p>
+                </div>
+              )}
 
               <div className="mt-5 flex items-center justify-between gap-3">
                 <Button variant="outlineLight" onClick={() => setSetupStep("games")}>
                   ← Back
                 </Button>
-                <Button onClick={() => setSetupStep("lobby")} disabled={deck.length === 0}>
+                <Button onClick={() => setSetupStep("lobby")} disabled={lyricsNeeded && deck.length === 0}>
                   Next · Lobby →
                 </Button>
               </div>
@@ -860,6 +918,12 @@ export default function HostRoom({ code }: { code: string }) {
                 </div>
               ) : null}
 
+              {session && session.miniGames.includes("voice_clash") ? (
+                <div className="border-t border-black/10 p-5 sm:p-6">
+                  <VoiceStudio code={session.code} session={session} onSession={setSession} />
+                </div>
+              ) : null}
+
               {/* START */}
               <div className="border-t border-black/10 bg-black/[0.02] p-5 sm:p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -886,8 +950,9 @@ export default function HostRoom({ code }: { code: string }) {
                       })}
                     </div>
                     <p className="mt-2 text-xs text-black/45">
-                      {session?.miniGames.length ?? 0} mini-game{(session?.miniGames.length ?? 0) === 1 ? "" : "s"} · {deck.length}{" "}
-                      track{deck.length === 1 ? "" : "s"} ready
+                      {session?.miniGames.length ?? 0} mini-game{(session?.miniGames.length ?? 0) === 1 ? "" : "s"} ·{" "}
+                      {lyricsNeeded ? `${deck.length} track${deck.length === 1 ? "" : "s"}` : "generated audio"}
+                      {selectedGames.includes("stem_heist") ? ` · ${preparedStems}/4 stems` : ""}
                     </p>
                   </div>
                   <div className="flex w-full flex-col gap-2 sm:w-64">
@@ -895,9 +960,11 @@ export default function HostRoom({ code }: { code: string }) {
                       variant="magenta"
                       full
                       onClick={() => {
-                        if (deck[0]) void start(deck[0], deck);
+                        // Generated-only shows have no deck — start on a placeholder.
+                        const startDeck = deck.length ? deck : [GENERATED_PLACEHOLDER];
+                        void start(startDeck[0], startDeck);
                       }}
-                      disabled={deck.length === 0 || loadingTrackId !== null}
+                      disabled={!canStart || loadingTrackId !== null}
                     >
                       {loadingTrackId !== null ? "Starting…" : "Start show ▶"}
                     </Button>
@@ -910,6 +977,24 @@ export default function HostRoom({ code }: { code: string }) {
                     </button>
                   </div>
                 </div>
+
+                {/* No silent fallback: if a selected game isn't ready, say exactly why
+                    and block Start — never swap it for another game behind the scenes. */}
+                {!canStart ? (
+                  <div className="mt-4 rounded-lg border border-tangerine/40 bg-tangerine/10 px-4 py-3">
+                    <p className="font-mono text-[0.6rem] uppercase tracking-[0.16em] text-tangerine-600">
+                      Can't start yet
+                    </p>
+                    <ul className="mt-1.5 space-y-1">
+                      {blockerReasons.map((reason) => (
+                        <li key={reason} className="flex items-start gap-2 text-sm text-black/70">
+                          <span className="mt-0.5 text-tangerine-600">⚠</span>
+                          <span>{reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
 
                 {/* Emphasis: ideally wait for a player, but starting solo is fine for a demo. */}
                 <div className="mt-4 flex items-center gap-2.5 border-t border-black/10 pt-4">
@@ -990,7 +1075,11 @@ function HostRound({
         </div>
       </div>
 
-      {active?.audioUrl ? <AudioRoundStage round={active} /> : null}
+      {active?.answerType === "judge" ? (
+        <VoiceClashStage round={active} />
+      ) : active?.audioUrl ? (
+        <AudioRoundStage round={active} />
+      ) : null}
 
       {active && active.prompt ? (
         <p className="mt-10 text-4xl font-semibold leading-tight text-ink sm:text-6xl">
@@ -1089,7 +1178,20 @@ function HostRound({
 // Plays the generated instrumental bed for an audio round on the shared TV.
 function AudioRoundStage({ round }: { round: NonNullable<PublicSessionState["currentRound"]> }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [blocked, setBlocked] = useState(false);
   const playing = round.status === "answering";
+
+  // Browsers block autoplay outside a user-gesture window. Try to play; if it's
+  // rejected, surface a tap-to-play button instead of failing silently.
+  const tryPlay = useCallback(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    void el
+      .play()
+      .then(() => setBlocked(false))
+      .catch(() => setBlocked(true));
+  }, []);
+
   useEffect(() => {
     const el = audioRef.current;
     if (!el || !round.audioUrl) return;
@@ -1099,13 +1201,11 @@ function AudioRoundStage({ round }: { round: NonNullable<PublicSessionState["cur
       el.load();
     }
     el.volume = 0.7;
-    if (playing) {
-      void el.play().catch(() => {});
-    } else {
-      el.pause();
-    }
+    if (playing) tryPlay();
+    else el.pause();
     return () => el.pause();
-  }, [round.audioUrl, playing]);
+  }, [round.audioUrl, playing, tryPlay]);
+
   return (
     <div className="mt-8 flex items-center gap-4 rounded-md border border-black/10 bg-black/[0.04] px-5 py-4">
       <audio ref={audioRef} loop preload="auto" />
@@ -1117,12 +1217,106 @@ function AudioRoundStage({ round }: { round: NonNullable<PublicSessionState["cur
           playing ? (round.bpm ? "animate-pulse" : "animate-spin") : "",
         ].join(" ")}
       />
-      <div>
+      <div className="min-w-0">
         <p className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-black/45">Now playing</p>
         <p className="text-lg font-semibold text-ink">
           {round.bpm ? `Tap on the beat · ${round.bpm} BPM` : "Name the vibe"}
         </p>
       </div>
+      {blocked && playing ? (
+        <button
+          type="button"
+          onClick={tryPlay}
+          className="ml-auto flex h-11 shrink-0 items-center gap-2 rounded-md bg-brand px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-400"
+        >
+          ▶ Tap for audio
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+// Voice Clash (judge round): play the host-voice vocal over a ducked beat, show the
+// lyric, and reveal the crowd's studio score. Two <audio> elements layered (the
+// Music API returns beat + vocal separately and does no mixing).
+function VoiceClashStage({ round }: { round: NonNullable<PublicSessionState["currentRound"]> }) {
+  const beatRef = useRef<HTMLAudioElement | null>(null);
+  const vocalRef = useRef<HTMLAudioElement | null>(null);
+  const [blocked, setBlocked] = useState(false);
+  const playing = round.status === "answering";
+
+  // Start the layered beat + vocal together; if autoplay is blocked, show a tap.
+  const tryPlay = useCallback(() => {
+    const beat = beatRef.current;
+    const vocal = vocalRef.current;
+    if (!beat || !vocal) return;
+    beat.volume = 0.35;
+    vocal.volume = 1;
+    void Promise.allSettled([beat.play(), vocal.play()]).then((results) =>
+      setBlocked(results.some((r) => r.status === "rejected")),
+    );
+  }, []);
+
+  useEffect(() => {
+    const beat = beatRef.current;
+    const vocal = vocalRef.current;
+    if (!beat || !vocal) return;
+    if (round.audioUrl && beat.getAttribute("data-src") !== round.audioUrl) {
+      beat.src = round.audioUrl;
+      beat.setAttribute("data-src", round.audioUrl);
+      beat.load();
+    }
+    if (round.vocalUrl && vocal.getAttribute("data-src") !== round.vocalUrl) {
+      vocal.src = round.vocalUrl;
+      vocal.setAttribute("data-src", round.vocalUrl);
+      vocal.load();
+    }
+    if (playing) tryPlay();
+    else {
+      beat.pause();
+      vocal.pause();
+    }
+    return () => {
+      beat.pause();
+      vocal.pause();
+    };
+  }, [round.audioUrl, round.vocalUrl, playing, tryPlay]);
+
+  return (
+    <div className="mt-8 rounded-md border border-black/10 bg-black/[0.04] p-5">
+      <audio ref={beatRef} loop preload="auto" />
+      <audio ref={vocalRef} preload="auto" />
+      <div className="flex items-center gap-4">
+        <span
+          aria-hidden
+          className={["inline-block h-6 w-6 shrink-0 rounded-full bg-brand", playing ? "animate-pulse" : ""].join(" ")}
+        />
+        <div className="min-w-0">
+          <p className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-black/45">
+            Now playing · {round.trackName}
+          </p>
+          <p className="text-lg font-semibold text-ink">
+            {round.status === "revealed" ? "How did the crowd rate it?" : "Rate the track on your phone"}
+          </p>
+        </div>
+        {round.status === "revealed" && typeof round.studioScore === "number" ? (
+          <div className="ml-auto text-right">
+            <p className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-black/45">Studio score</p>
+            <p className="text-3xl font-bold text-brand">{round.studioScore}</p>
+          </div>
+        ) : blocked && playing ? (
+          <button
+            type="button"
+            onClick={tryPlay}
+            className="ml-auto flex h-11 shrink-0 items-center gap-2 rounded-md bg-brand px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-400"
+          >
+            ▶ Tap for audio
+          </button>
+        ) : null}
+      </div>
+      {round.lyric ? (
+        <p className="mt-4 whitespace-pre-line text-xl leading-relaxed text-ink/90">{round.lyric}</p>
+      ) : null}
     </div>
   );
 }

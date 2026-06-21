@@ -100,8 +100,17 @@ export function buildBeatRoundSpec(seed: number, tier: number): BeatRoundSpec {
 }
 
 // ---- generation + in-process cache (used by /api/music) ----
-const cache = new Map<string, Uint8Array>();
-const pending = new Map<string, Promise<Uint8Array>>();
+// Pinned to globalThis so generated beds survive dev HMR (a module-level Map is
+// wiped on recompile, forcing needless regeneration mid-session).
+const globalForBed = globalThis as typeof globalThis & {
+  __soundclashMusicBed?: Map<string, Uint8Array>;
+  __soundclashMusicBedPending?: Map<string, Promise<Uint8Array>>;
+};
+const cache: Map<string, Uint8Array> = globalForBed.__soundclashMusicBed ?? new Map();
+globalForBed.__soundclashMusicBed = cache;
+const pending: Map<string, Promise<Uint8Array>> =
+  globalForBed.__soundclashMusicBedPending ?? new Map();
+globalForBed.__soundclashMusicBedPending = pending;
 
 function promptForKey(key: string): string {
   if (key.startsWith("beat:")) {

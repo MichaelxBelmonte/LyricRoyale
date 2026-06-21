@@ -25,7 +25,9 @@ import { getRichsyncLines, getTrackLyrics } from "@/lib/server/musixmatch";
 import { DEFAULT_BANTER_PACK, staticBanterPack, type BanterPack } from "@/lib/game/host-banter";
 import { normalizeLanguage } from "@/lib/game/languages";
 import { avatarForIndex, isPlayerAvatar } from "@/lib/session/avatars";
-import { ALL_MINI_GAME_IDS, orderMiniGames } from "@/lib/session/mini-games";
+import { ALL_MINI_GAME_IDS, gameBlockers, orderMiniGames } from "@/lib/session/mini-games";
+import { generateLyricChoices, type LyricGame } from "@/lib/server/anthropic";
+import { gameCopy } from "@/lib/game/game-copy";
 import type { FinishLineDrop, Locale, TrackSummary } from "@/lib/types";
 import type {
   CreateSessionInput,
@@ -119,6 +121,11 @@ function publicState(session: PartySession): PublicSessionState {
     playerCount: session.players.length,
     players: [...session.players].sort((a, b) => b.score - a.score || a.joinedAt - b.joinedAt),
     currentRound,
+    capabilities: {
+      audioGen: isMusicGenerationAvailable(),
+      stemSeparation: Boolean(process.env.LALAL_API_KEY),
+      voiceClone: isMusicGenerationAvailable(),
+    },
   };
 }
 
@@ -149,6 +156,8 @@ export function createSession(input: CreateSessionInput = {}): PublicSessionStat
     difficultyFloor: clampFloor(input.difficultyFloor),
     usedPromptKeys: [],
     trackStems: {},
+    voiceClone: null,
+    voiceTracks: [],
     autopilot: input.autopilot ?? true,
     trackPool: [],
     players: [],
@@ -221,6 +230,10 @@ const NEEDS_RICHSYNC = new Set<MiniGameId>(["the_drop", "on_beat"]);
 // Generated-audio games need ElevenLabs Music configured (no real song / no lyrics).
 const GENERATED_AUDIO_GAMES = new Set<MiniGameId>(["genre_roulette", "beat_lock"]);
 
+// Per-game minimum answering window (ms): floors the difficulty timer when a game
+// needs a longer listen. Genre Roulette needs ~20s — you can't name a vibe in 8s.
+const MIN_TIME_BY_GAME: Partial<Record<MiniGameId, number>> = { genre_roulette: 20_000 };
+
 // A game is playable on a given track only if its data requirement is met:
 // audio games need music generation; the_drop / on_beat need richsync timing.
 function isPlayable(game: MiniGameId, hasRichsync: boolean): boolean {
@@ -232,10 +245,14 @@ function countReadyStems(session: PartySession): number {
   return Object.keys(session.trackStems).length;
 }
 
-// Session-aware readiness: Stem Heist additionally needs lalal.ai configured and
-// >=4 host-prepared stems; everything else falls back to the static isPlayable.
+// Session-aware readiness: Stem Heist needs lalal.ai + >=4 host-prepared stems;
+// Voice Clash needs ElevenLabs + a voice clone + >=1 baked track; everything else
+// falls back to the static isPlayable.
 function gameReady(session: PartySession, game: MiniGameId, hasRichsync: boolean): boolean {
   if (game === "stem_heist") return Boolean(process.env.LALAL_API_KEY) && countReadyStems(session) >= 4;
+  if (game === "voice_clash") {
+    return isMusicGenerationAvailable() && Boolean(session.voiceClone) && session.voiceTracks.length >= 1;
+  }
   return isPlayable(game, hasRichsync);
 }
 
@@ -259,10 +276,7 @@ function seedShuffle<T>(items: readonly T[], seed: number): T[] {
 // varied and (with ≥6 games selected) never repeats. When the chosen game needs
 // richsync the current track lacks, it substitutes the next *playable, unused*
 // game rather than collapsing every such slot onto "finish_line".
-function nextMiniGame(session: PartySession, requested: MiniGameId | undefined, hasRichsync: boolean): MiniGameId {
-  // Manual override: honor the host's pick (degrading only on richsync mismatch).
-  if (requested) return gameReady(session, requested, hasRichsync) ? requested : "finish_line";
-
+function pickFromRotation(session: PartySession, hasRichsync: boolean): MiniGameId {
   const rotation = session.rotation.length ? session.rotation : DEFAULT_MINI_GAMES;
   const cycleLen = rotation.length;
   const lastGame = session.currentRound?.miniGame;
@@ -278,63 +292,22 @@ function nextMiniGame(session: PartySession, requested: MiniGameId | undefined, 
     rotation.find((g) => gameReady(session, g, hasRichsync) && !usedThisCycle.has(g)) ??
     rotation.find((g) => gameReady(session, g, hasRichsync) && g !== lastGame) ??
     rotation.find((g) => gameReady(session, g, hasRichsync)) ??
+    // The setup gate guarantees readiness, so this only fires on a per-track build
+    // edge — and it stays WITHIN the host's selection, never a game they didn't pick.
+    rotation[0] ??
     "finish_line"
   );
 }
 
-function labelsFor(miniGame: MiniGameId) {
-  if (miniGame === "name_song") {
-    return {
-      title: "Name That Song",
-      instruction: "Pick the track that contains this lyric.",
-    };
-  }
-  if (miniGame === "next_line") {
-    return {
-      title: "Next Line",
-      instruction: "Pick the line that comes next.",
-    };
-  }
-  if (miniGame === "artist_pick") {
-    return {
-      title: "Artist Lock",
-      instruction: "Pick the artist behind this lyric.",
-    };
-  }
-  if (miniGame === "word_rush") {
-    return {
-      title: "Word Rush",
-      instruction: "Pick the recurring keyword.",
-    };
-  }
-  if (miniGame === "the_drop") {
-    return {
-      title: "The Drop",
-      instruction: "Tap the missing word as the lyric lands.",
-    };
-  }
-  if (miniGame === "on_beat") {
-    return {
-      title: "On The Beat",
-      instruction: "Lock the word right as the beat hits — timing scores.",
-    };
-  }
-  if (miniGame === "mondegreen") {
-    return {
-      title: "Misheard",
-      instruction: "One line is the real lyric. The rest are mondegreens.",
-    };
-  }
-  if (miniGame === "song_mash") {
-    return {
-      title: "Who Said It",
-      instruction: "Which track dropped this line?",
-    };
-  }
-  return {
-    title: "Finish the Line",
-    instruction: "Tap the missing word.",
-  };
+// Pick the next mini-game for an autopilot round. A not-ready game is NEVER
+// silently swapped for one outside the host's selection: the start gate blocks
+// the show until every chosen game has its content, so picks here always come
+// from the host's own rotation.
+function nextMiniGame(session: PartySession, requested: MiniGameId | undefined, hasRichsync: boolean): MiniGameId {
+  // Manual override: honor the host's pick; if it can't run on this track, fall
+  // back to another SELECTED, ready game (not a hardcoded one).
+  if (requested) return gameReady(session, requested, hasRichsync) ? requested : pickFromRotation(session, hasRichsync);
+  return pickFromRotation(session, hasRichsync);
 }
 
 // Stable key identifying the lyric line a round was built from, for cross-round
@@ -360,6 +333,8 @@ function buildAudioRound(input: {
   seed: number;
   startedAt: number;
 }): SessionRound {
+  // Floor the answering window per game (Genre Roulette needs a longer listen).
+  const timeLimitMs = Math.max(input.diff.timeLimitMs, MIN_TIME_BY_GAME[input.miniGame] ?? 0);
   const common = {
     index: input.roundIndex,
     miniGame: input.miniGame,
@@ -369,9 +344,9 @@ function buildAudioRound(input: {
     hasRichsync: input.track.hasRichsync,
     seed: input.seed,
     difficulty: input.tier,
-    timeLimitMs: input.diff.timeLimitMs,
+    timeLimitMs,
     startedAt: input.startedAt,
-    endsAt: input.startedAt + input.diff.timeLimitMs,
+    endsAt: input.startedAt + timeLimitMs,
     status: "answering" as const,
     answers: [],
   };
@@ -448,6 +423,66 @@ function buildStemHeistRound(input: {
   };
 }
 
+// Voice Clash (judge round): play a baked host-voice track (vocal over a generated
+// beat) and let the crowd rate it. No correct answer — scoring happens at reveal.
+function buildVoiceClashRound(input: {
+  session: PartySession;
+  track: SessionTrackRef;
+  roundIndex: number;
+  tier: DifficultyTier;
+  diff: RoundDifficultyConfig;
+  seed: number;
+  startedAt: number;
+}): SessionRound {
+  const tracks = input.session.voiceTracks;
+  if (!tracks.length) throw new Error("voice_clash_not_ready");
+  const pick = tracks[seedIndex(input.seed, tracks.length)];
+  // Give the crowd time to actually listen before rating.
+  const timeLimitMs = Math.max(input.diff.timeLimitMs, 22_000);
+  return {
+    index: input.roundIndex,
+    miniGame: "voice_clash",
+    title: "Voice Clash",
+    instruction: "Listen — then rate the track.",
+    trackId: input.track.trackId,
+    trackName: input.session.voiceClone?.label ?? "Host voice",
+    artistName: pick.creatorName ?? input.session.voiceClone?.label ?? "Host voice",
+    hasRichsync: false,
+    seed: input.seed,
+    difficulty: input.tier,
+    timeLimitMs,
+    prompt: "",
+    answerType: "judge",
+    audioUrl: pick.beatUrl,
+    vocalUrl: pick.vocalUrl,
+    lyric: pick.lyric,
+    creatorPlayerId: pick.creatorPlayerId,
+    solution: "",
+    startedAt: input.startedAt,
+    endsAt: input.startedAt + timeLimitMs,
+    status: "answering",
+    answers: [],
+  };
+}
+
+// Replace the locally-generated decoys with Claude-written, context-plausible
+// distractors when available (falls back to the local options on any failure or
+// timeout). This is what makes the lyrics games actually hard — the wrong answers
+// fit the line instead of being unrelated words.
+async function logicalOptions(
+  game: LyricGame,
+  line: string,
+  answer: string,
+  fallback: string[],
+  optionCount: number,
+  seed: number,
+): Promise<string[]> {
+  const need = Math.max(1, optionCount - 1);
+  const distractors = await generateLyricChoices({ game, line, answer, count: need });
+  if (!distractors || distractors.length < need) return fallback;
+  return seedShuffle([answer, ...distractors.slice(0, need)], seed + 31);
+}
+
 async function buildSessionRound(input: {
   session: PartySession;
   track: SessionTrackRef;
@@ -459,10 +494,13 @@ async function buildSessionRound(input: {
   // Per-match difficulty curve: ramps from the host's floor toward the finale.
   const tier = tierForRound(roundIndex, input.session.rounds, input.session.difficultyFloor);
   const diff = resolveDifficulty(tier);
+  // Round title + instruction follow the session's narrator language (it/en today,
+  // English fallback otherwise) instead of always being English.
+  const copy = gameCopy(input.miniGame, input.session.narratorLang);
 
   // Audio games carry no lyrics — build them before any Musixmatch fetch.
   if (input.miniGame === "genre_roulette" || input.miniGame === "beat_lock") {
-    return buildAudioRound({
+    const audioRound = buildAudioRound({
       miniGame: input.miniGame,
       track: input.track,
       roundIndex,
@@ -471,11 +509,12 @@ async function buildSessionRound(input: {
       seed: input.seed,
       startedAt: input.startedAt,
     });
+    return { ...audioRound, title: copy.title, instruction: copy.instruction };
   }
 
   // Stem Heist plays a host-prepared isolated stem — also lyric-free.
   if (input.miniGame === "stem_heist") {
-    return buildStemHeistRound({
+    const stemRound = buildStemHeistRound({
       session: input.session,
       track: input.track,
       roundIndex,
@@ -484,16 +523,30 @@ async function buildSessionRound(input: {
       seed: input.seed,
       startedAt: input.startedAt,
     });
+    return { ...stemRound, title: copy.title, instruction: copy.instruction };
+  }
+
+  // Voice Clash plays a baked host-voice track — lyric-free as far as Musixmatch.
+  if (input.miniGame === "voice_clash") {
+    const voiceRound = buildVoiceClashRound({
+      session: input.session,
+      track: input.track,
+      roundIndex,
+      tier,
+      diff,
+      seed: input.seed,
+      startedAt: input.startedAt,
+    });
+    return { ...voiceRound, title: copy.title, instruction: copy.instruction };
   }
 
   const lyrics = await getTrackLyrics(input.track.trackId);
-  const labels = labelsFor(input.miniGame);
   const excludeKeys = new Set(input.session.usedPromptKeys);
   const base = {
     index: roundIndex,
     miniGame: input.miniGame,
-    title: labels.title,
-    instruction: labels.instruction,
+    title: copy.title,
+    instruction: copy.instruction,
     trackId: input.track.trackId,
     trackName: input.track.trackName,
     artistName: input.track.artistName,
@@ -520,11 +573,19 @@ async function buildSessionRound(input: {
       decoySimilarity: diff.decoySimilarity,
       excludeKeys,
     });
+    const options = await logicalOptions(
+      "next_line",
+      nextLine.prompt,
+      nextLine.answer,
+      nextLine.options,
+      diff.optionCount,
+      input.seed,
+    );
     return {
       ...base,
       prompt: nextLine.prompt,
       answerType: "choice",
-      options: nextLine.options,
+      options,
       solution: nextLine.answer,
     };
   }
@@ -593,11 +654,19 @@ async function buildSessionRound(input: {
       tracking: lyrics.tracking,
       excludeKeys,
     });
+    const options = await logicalOptions(
+      "mondegreen",
+      mondegreen.answer,
+      mondegreen.answer,
+      mondegreen.options,
+      mondegreen.options.length,
+      input.seed,
+    );
     return {
       ...base,
       prompt: mondegreen.prompt,
       answerType: "choice",
-      options: mondegreen.options,
+      options,
       solution: mondegreen.answer,
     };
   }
@@ -643,11 +712,19 @@ async function buildSessionRound(input: {
     }
   }
 
+  const options = await logicalOptions(
+    "finish_line",
+    generated.line,
+    generated.answer,
+    generated.options,
+    diff.optionCount,
+    input.seed,
+  );
   return {
     ...base,
     prompt,
     answerType: "choice",
-    options: generated.options,
+    options,
     drop,
     solution: generated.answer,
   };
@@ -680,6 +757,19 @@ export async function startRound(sessionCode: string, input: StartRoundInput): P
   if (!session.trackPool.some((item) => item.trackId === track.trackId)) {
     session.trackPool = [track, ...session.trackPool].slice(0, 8);
   }
+
+  // No silent fallback: every selected game must have its content ready. A game
+  // that isn't ready blocks the show here (the host UI gates this upstream) rather
+  // than being swapped for a different game mid-rotation.
+  const blockers = gameBlockers(session.miniGames, {
+    deckCount: session.trackPool.length,
+    preparedStems: countReadyStems(session),
+    voiceTracks: session.voiceTracks.length,
+    voiceCloned: Boolean(session.voiceClone),
+    audioGen: isMusicGenerationAvailable(),
+    stemSeparation: Boolean(process.env.LALAL_API_KEY),
+  });
+  if (blockers.length > 0) throw new Error(`games_not_ready:${blockers.map((b) => b.game).join(",")}`);
 
   const startedAt = now();
   const hasRichsync = track.hasRichsync === true;
@@ -746,20 +836,25 @@ export async function submitAnswer(sessionCode: string, input: SubmitAnswerInput
   // Beat Lock submits a 0..100 timing-accuracy score (computed on the phone)
   // instead of a text/choice answer.
   const isTap = round.answerType === "tap";
+  // Voice Clash: the guess is a 0..100 crowd rating. No correct answer; points are
+  // tallied at reveal (critic accuracy needs the final crowd average), so 0 now.
+  const isJudge = round.answerType === "judge";
   const tapAccuracy = isTap ? Math.max(0, Math.min(100, Number.parseFloat(guess) || 0)) : 0;
   const solution = round.solution ?? "";
-  const correct = isTap ? tapAccuracy >= 50 : normalizeAnswer(guess) === normalizeAnswer(solution);
-  const points = isTap
-    ? Math.round(tapAccuracy * 10)
-    : (round.miniGame === "on_beat" || round.miniGame === "the_drop") && round.drop
-      ? scoreRound({
-          isCorrect: correct,
-          elapsedMs,
-          streak: correct ? 1 : 0,
-          dropProximityMs: onBeatProximityMs(round.drop, elapsedMs),
-          timeLimitMs: limitMs,
-        }).total
-      : scoreFinishLine(correct, elapsedMs, limitMs);
+  const correct = isTap ? tapAccuracy >= 50 : isJudge ? false : normalizeAnswer(guess) === normalizeAnswer(solution);
+  const points = isJudge
+    ? 0
+    : isTap
+      ? Math.round(tapAccuracy * 10)
+      : (round.miniGame === "on_beat" || round.miniGame === "the_drop") && round.drop
+        ? scoreRound({
+            isCorrect: correct,
+            elapsedMs,
+            streak: correct ? 1 : 0,
+            dropProximityMs: onBeatProximityMs(round.drop, elapsedMs),
+            timeLimitMs: limitMs,
+          }).total
+        : scoreFinishLine(correct, elapsedMs, limitMs);
   const answer: SessionAnswer = {
     playerId: player.id,
     playerName: player.name,
@@ -777,12 +872,100 @@ export async function submitAnswer(sessionCode: string, input: SubmitAnswerInput
   return { answer, session: publicState(session) };
 }
 
+const clampRating = (n: number): number => Math.max(0, Math.min(100, Number.isFinite(n) ? n : 0));
+
+// Tally a Voice Clash round at reveal: the studio score is the crowd average, and
+// each voter earns "critic" points for being close to that average (keeps everyone
+// honestly engaged in judging). If a PLAYER authored the track, they earn the crowd
+// score and are excluded from rating their own. Applied once (guarded by status).
+function scoreJudgeRound(session: PartySession, round: SessionRound): void {
+  const votes = round.answers.filter((a) => a.playerId !== round.creatorPlayerId);
+  const ratings = votes.map((a) => clampRating(Number.parseFloat(a.guess)));
+  const avg = ratings.length ? ratings.reduce((s, r) => s + r, 0) / ratings.length : 0;
+  round.studioScore = Math.round(avg);
+
+  for (const answer of votes) {
+    const rating = clampRating(Number.parseFloat(answer.guess));
+    const closeness = Math.max(0, 1 - Math.abs(rating - avg) / 100); // 0..1
+    const pts = 150 + Math.round(closeness * 350); // 150..500
+    answer.points = pts;
+    const player = session.players.find((p) => p.id === answer.playerId);
+    if (player) player.score += pts;
+  }
+
+  if (round.creatorPlayerId) {
+    const author = session.players.find((p) => p.id === round.creatorPlayerId);
+    if (author) author.score += Math.round(avg * 7); // up to 700 for a 100 crowd score
+  }
+}
+
 export function revealRound(sessionCode: string): PublicSessionState {
   const session = assertSession(sessionCode);
-  if (session.currentRound) session.currentRound.status = "revealed";
+  const round = session.currentRound;
+  if (round && round.status !== "revealed") {
+    if (round.answerType === "judge") scoreJudgeRound(session, round);
+    round.status = "revealed";
+  }
   session.status = "results";
   session.updatedAt = now();
   return publicState(session);
+}
+
+// ---- Voice Clash (Voice Studio) mutations ----------------------------------
+
+// Attach the host's instant voice clone to the session (after IVC + consent).
+export function setVoiceClone(
+  sessionCode: string,
+  entry: { voiceId?: string; label?: string; requiresVerification?: boolean },
+): PublicSessionState {
+  const session = assertSession(sessionCode);
+  if (typeof entry.voiceId === "string" && entry.voiceId) {
+    session.voiceClone = {
+      voiceId: entry.voiceId,
+      label: String(entry.label || "Host voice"),
+      requiresVerification: Boolean(entry.requiresVerification),
+    };
+    session.updatedAt = now();
+  }
+  return publicState(session);
+}
+
+// The next track id the Voice Studio should bake into (stable, monotonic).
+export function nextVoiceTrackId(sessionCode: string): number {
+  const session = assertSession(sessionCode);
+  return (session.voiceTracks.at(-1)?.id ?? 0) + 1;
+}
+
+// Register a baked Voice Clash track (beat + host-voice vocal already cached).
+export function addVoiceTrack(
+  sessionCode: string,
+  track: { id: number; vibe?: string; lyric?: string; beatUrl: string; vocalUrl: string; creatorPlayerId?: string; creatorName?: string },
+): PublicSessionState {
+  const session = assertSession(sessionCode);
+  if (track.beatUrl && track.vocalUrl) {
+    session.voiceTracks.push({
+      id: track.id,
+      vibe: String(track.vibe || "boombap"),
+      lyric: String(track.lyric || ""),
+      beatUrl: track.beatUrl,
+      vocalUrl: track.vocalUrl,
+      creatorPlayerId: track.creatorPlayerId,
+      creatorName: track.creatorName,
+    });
+    session.updatedAt = now();
+  }
+  return publicState(session);
+}
+
+// Reset the Voice Studio (drop the clone reference + baked tracks). Returns the
+// voiceId so the caller can DELETE it at ElevenLabs and clear the audio cache.
+export function clearVoiceStudio(sessionCode: string): { session: PublicSessionState; voiceId: string | null } {
+  const session = assertSession(sessionCode);
+  const voiceId = session.voiceClone?.voiceId ?? null;
+  session.voiceClone = null;
+  session.voiceTracks = [];
+  session.updatedAt = now();
+  return { session: publicState(session), voiceId };
 }
 
 // Attach a host-prepared isolated stem to a deck track (Stem Lab → lalal.ai).

@@ -186,6 +186,8 @@ export default function PlayerRoom({ code }: { code: string }) {
                 submitting={submitting}
                 onLock={(score) => void submitGuess(String(score))}
               />
+            ) : session.currentRound.answerType === "judge" ? (
+              <JudgePad submitting={submitting} onRate={(score) => void submitGuess(String(score))} />
             ) : session.currentRound.answerType === "choice" ? (
               <div className="mt-6 grid gap-2">
                 {session.currentRound.options?.map((option, index) => (
@@ -257,6 +259,57 @@ export default function PlayerRoom({ code }: { code: string }) {
         ) : null}
       </section>
     </main>
+  );
+}
+
+// Voice Clash: rate the host's track 0..100. No correct answer — the crowd average
+// becomes the studio score, and you earn "critic" points for landing near it.
+function JudgePad({
+  submitting,
+  onRate,
+}: {
+  submitting: boolean;
+  onRate: (score: number) => void;
+}) {
+  const [value, setValue] = useState(50);
+  const PRESETS: [string, number][] = [
+    ["Cursed", 12],
+    ["Mid", 50],
+    ["Banger", 92],
+  ];
+  return (
+    <div className="mt-6 space-y-4">
+      <div className="rounded-xl border-2 border-black/15 bg-white p-5 text-center">
+        <p className="font-condensed text-6xl tabular-nums text-[#15120E]">{value}</p>
+        <p className="font-mono text-[0.6rem] uppercase tracking-[0.14em] text-black/45">your rating</p>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={value}
+        onChange={(event) => setValue(Number(event.target.value))}
+        disabled={submitting}
+        className="w-full accent-[#C2563B]"
+        aria-label="Rate the track"
+      />
+      <div className="flex gap-2">
+        {PRESETS.map(([label, preset]) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => setValue(preset)}
+            disabled={submitting}
+            className="flex-1 rounded-lg border border-black/15 py-2 font-condensed text-xs uppercase tracking-[0.04em] text-black/70 transition-colors hover:border-[#C2563B] disabled:opacity-50"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <Button type="button" variant="magenta" full disabled={submitting} onClick={() => onRate(value)}>
+        {submitting ? "Locking…" : "Lock my rating"}
+      </Button>
+    </div>
   );
 }
 
