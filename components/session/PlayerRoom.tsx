@@ -107,7 +107,7 @@ export default function PlayerRoom({ code }: { code: string }) {
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-      <header className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+      <header className="flex items-center justify-between gap-3 border-b border-black/10 pb-4">
         <div className="flex min-w-0 items-center gap-3">
           <Link href="/" aria-label="Soundclash — home" className="shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -115,28 +115,28 @@ export default function PlayerRoom({ code }: { code: string }) {
               src="/brand/logomark.png"
               alt=""
               aria-hidden
-              className="h-9 w-9 rounded-lg border border-white/10 transition-opacity hover:opacity-80"
+              className="h-9 w-9 rounded-lg border border-black/10 transition-opacity hover:opacity-80"
             />
           </Link>
           <Avatar name={me?.name ?? "Player"} emoji={me?.avatar} size="lg" />
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">{me?.name ?? "Player"}</p>
-            <p className="font-mono text-xs text-neutral-500">Room {code}</p>
+            <p className="truncate text-sm font-semibold text-ink">{me?.name ?? "Player"}</p>
+            <p className="font-mono text-xs text-black/45">Room {code}</p>
           </div>
         </div>
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-right">
-          <p className="font-mono text-[0.55rem] uppercase tracking-[0.2em] text-aqua-300">Score</p>
-          <p className="font-mono text-2xl tabular-nums text-white">{me?.score ?? 0}</p>
+        <div className="rounded-lg border border-black/10 bg-black/[0.03] px-3 py-1.5 text-right">
+          <p className="font-mono text-[0.55rem] uppercase tracking-[0.2em] text-aqua">Score</p>
+          <p className="font-mono text-2xl tabular-nums text-ink">{me?.score ?? 0}</p>
         </div>
       </header>
 
       <section className="flex flex-1 flex-col justify-center py-6">
         {error ? (
-          <div className="mb-3 rounded-xl border border-[#C2563B]/30 bg-[#C2563B]/5 p-3 text-sm text-[#E0967F]">
+          <div className="mb-3 rounded-xl border border-[#C2563B]/30 bg-[#C2563B]/10 p-3 text-sm text-[#A2452E]">
             <p>{error}</p>
             <Link
               href="/"
-              className="mt-2 inline-block font-semibold uppercase tracking-[0.1em] text-white underline underline-offset-4"
+              className="mt-2 inline-block font-semibold uppercase tracking-[0.1em] text-ink underline underline-offset-4"
             >
               Back home
             </Link>
@@ -246,7 +246,7 @@ export default function PlayerRoom({ code }: { code: string }) {
             roundKey={`${session.code}:${session.currentRound.index}:${session.currentRound.trackId}`}
             copyright={session.currentRound.copyright}
             tracking={session.currentRound.tracking}
-            className="mt-6 text-center text-[0.62rem] leading-4 text-white/40"
+            className="mt-6 text-center text-[0.62rem] leading-4 text-black/45"
           />
         ) : null}
       </section>

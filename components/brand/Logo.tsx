@@ -31,7 +31,7 @@ export default function Logo({
           src="/brand/logomark.png"
           alt=""
           aria-hidden
-          className={`shrink-0 rounded-lg border border-white/10 ${markClassName}`}
+          className={`shrink-0 rounded-lg border border-black/10 ${markClassName}`}
         />
       ) : null}
       {/* eslint-disable-next-line @next/next/no-img-element */}

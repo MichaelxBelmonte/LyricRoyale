@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { backToLobby, getSession, revealRound, setMiniGames, touchPlayer } from "@/lib/server/session-store";
+import {
+  backToLobby,
+  getSession,
+  revealRound,
+  setMiniGames,
+  setSessionRounds,
+  touchPlayer,
+} from "@/lib/server/session-store";
 import type { MiniGameId } from "@/lib/session/types";
 import type { ErrorResponse } from "@/lib/types";
 
@@ -30,11 +37,16 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { code } = await params;
-  const body = (await req.json().catch(() => ({}))) as { action?: string; miniGames?: MiniGameId[] };
+  const body = (await req.json().catch(() => ({}))) as {
+    action?: string;
+    miniGames?: MiniGameId[];
+    rounds?: number;
+  };
   try {
     if (body.action === "reveal") return NextResponse.json({ session: revealRound(code) });
     if (body.action === "lobby") return NextResponse.json({ session: backToLobby(code) });
     if (body.action === "configure") return NextResponse.json({ session: setMiniGames(code, body.miniGames ?? []) });
+    if (body.action === "rounds") return NextResponse.json({ session: setSessionRounds(code, Number(body.rounds)) });
     return NextResponse.json<ErrorResponse>(
       { error: "Invalid session action.", code: "invalid_session_action" },
       { status: 400 },

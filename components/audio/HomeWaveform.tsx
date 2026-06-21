@@ -94,10 +94,12 @@ export default function HomeWaveform() {
       const gap = 3 * dpr;
       const barWidth = Math.max(3 * dpr, (width - gap * (bars - 1)) / bars);
       const mid = height * 0.52;
+      // Warm editorial sweep — terracotta into amber, matching the cream/terracotta
+      // hero (the cool teal is reserved for the play-state button, not the bars).
       const gradient = context.createLinearGradient(0, 0, width, 0);
-      gradient.addColorStop(0, "#D99A3C");
-      gradient.addColorStop(0.48, "#C2563B");
-      gradient.addColorStop(1, "#2E7D6B");
+      gradient.addColorStop(0, "#C2563B");
+      gradient.addColorStop(0.55, "#D06A4E");
+      gradient.addColorStop(1, "#D99A3C");
 
       context.fillStyle = gradient;
 
@@ -113,7 +115,7 @@ export default function HomeWaveform() {
       }
 
       context.globalAlpha = 1;
-      context.strokeStyle = "rgba(255,241,214,0.32)";
+      context.strokeStyle = "rgba(21,18,14,0.18)";
       context.lineWidth = 1 * dpr;
       context.beginPath();
       context.moveTo(0, mid);
@@ -138,8 +140,8 @@ export default function HomeWaveform() {
         <canvas ref={canvasRef} className="h-24 w-full sm:h-28" aria-hidden="true" />
         <span
           className={[
-            "absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-black shadow-[0_5px_0_rgba(194,86,59,0.55)] transition-transform group-hover:-translate-y-[54%] group-active:-translate-y-[46%]",
-            state.enabled ? "border-[#2E7D6B]/50 bg-[#2E7D6B]" : "border-white/30 bg-[#F4ECD8]",
+            "absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-white shadow-[0_5px_0_rgba(126,54,35,0.7)] transition-transform group-hover:-translate-y-[54%] group-active:-translate-y-[46%]",
+            state.enabled ? "border-[#2E7D6B] bg-[#2E7D6B]" : "border-[#C2563B] bg-[#C2563B]",
           ].join(" ")}
           aria-hidden
         >
@@ -147,7 +149,7 @@ export default function HomeWaveform() {
         </span>
       </button>
 
-      <p className="text-center font-mono text-[0.58rem] uppercase tracking-[0.22em] text-white/35">
+      <p className="text-center font-mono text-[0.58rem] uppercase tracking-[0.22em] text-black/40">
         {state.enabled ? "Stop theme" : "Play theme"}
       </p>
     </div>

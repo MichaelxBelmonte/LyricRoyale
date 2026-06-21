@@ -20,7 +20,7 @@ interface BottomNavProps {
  */
 export default function BottomNav({ items, active, onSelect }: BottomNavProps) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-neutral-850 bg-neutral-950/90 backdrop-blur lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-black/10 bg-paper-raised/90 backdrop-blur lg:hidden">
       <div
         className="mx-auto grid w-full max-w-md px-2 pb-[env(safe-area-inset-bottom)]"
         style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
@@ -35,7 +35,7 @@ export default function BottomNav({ items, active, onSelect }: BottomNavProps) {
               aria-current={isActive ? "page" : undefined}
               className={[
                 "flex flex-col items-center gap-1 py-2.5 text-[0.6rem] font-medium uppercase tracking-[0.12em] transition-colors",
-                isActive ? "text-brand-300" : "text-neutral-500 hover:text-neutral-300",
+                isActive ? "text-brand" : "text-black/45 hover:text-black/70",
               ].join(" ")}
             >
               <Icon name={item.icon} size={20} />

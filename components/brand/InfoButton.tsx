@@ -19,19 +19,19 @@ export default function InfoButton() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label="How it works"
-        className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/40 font-condensed text-lg lowercase text-white backdrop-blur transition-colors hover:border-[#2E7D6B] hover:text-[#2E7D6B]"
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-black/15 bg-paper-raised/80 font-condensed text-lg lowercase text-ink backdrop-blur transition-colors hover:border-[#2E7D6B] hover:text-[#2E7D6B]"
       >
         i
       </button>
 
       {open ? (
-        <div className="absolute right-0 mt-2 max-h-[calc(100dvh_-_5rem)] w-72 max-w-[calc(100vw_-_1.5rem)] overflow-y-auto rounded-2xl border border-white/10 bg-[#0e0e10]/95 p-4 shadow-[0_18px_50px_-18px_rgba(0,0,0,0.85)] backdrop-blur">
-          <p className="font-condensed text-sm uppercase tracking-[0.12em] text-white">How it works</p>
+        <div className="absolute right-0 mt-2 max-h-[calc(100dvh_-_5rem)] w-72 max-w-[calc(100vw_-_1.5rem)] overflow-y-auto rounded-2xl border border-black/10 bg-paper-raised/95 p-4 shadow-[0_18px_50px_-18px_rgba(0,0,0,0.85)] backdrop-blur">
+          <p className="font-condensed text-sm uppercase tracking-[0.12em] text-ink">How it works</p>
           <ul className="mt-3 space-y-3">
             {POINTS.map(([title, body]) => (
               <li key={title}>
-                <p className="text-xs font-semibold text-[#86BDB0]">{title}</p>
-                <p className="mt-0.5 text-xs leading-5 text-neutral-400">{body}</p>
+                <p className="text-xs font-semibold text-aqua">{title}</p>
+                <p className="mt-0.5 text-xs leading-5 text-black/55">{body}</p>
               </li>
             ))}
           </ul>

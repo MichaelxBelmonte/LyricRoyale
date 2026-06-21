@@ -43,21 +43,21 @@ export default function Home() {
 
           {/* Tagline + actions */}
           <div className="flex w-full max-w-sm flex-col items-center gap-5 sm:max-w-md lg:col-start-1 lg:row-start-2 lg:max-w-none lg:items-start lg:self-start lg:gap-6">
-            <p className="font-condensed text-xl uppercase tracking-[0.04em] text-[#F4ECD8] sm:text-2xl lg:max-w-xl lg:text-4xl">
+            <p className="font-condensed text-xl uppercase tracking-[0.04em] text-ink sm:text-2xl lg:max-w-xl lg:text-4xl">
               Same track. Different challenge.
             </p>
 
             <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
               <Link
                 href="/host/new"
-                className="inline-flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-[#F4ECD8] px-7 font-condensed text-xl uppercase tracking-[0.06em] text-black shadow-[0_5px_0_rgba(194,86,59,0.55)] transition-transform hover:-translate-y-0.5 active:translate-y-0.5 sm:w-auto"
+                className="inline-flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-[#C2563B] px-7 font-condensed text-xl uppercase tracking-[0.06em] text-white shadow-[0_5px_0_rgba(126,54,35,0.85),0_16px_26px_-12px_rgba(194,86,59,0.6)] transition-transform hover:-translate-y-0.5 active:translate-y-0.5 sm:w-auto"
               >
                 Start clash
-                <Icon name="play" size={18} className="text-[#C2563B]" />
+                <Icon name="play" size={18} className="text-white" />
               </Link>
               <Link
                 href="/join"
-                className="inline-flex h-14 w-full items-center justify-center rounded-xl border border-white/15 px-7 font-condensed text-xl uppercase tracking-[0.06em] text-[#F4ECD8] transition-colors hover:border-[#2E7D6B] hover:text-[#2E7D6B] sm:w-auto"
+                className="inline-flex h-14 w-full items-center justify-center rounded-xl border-2 border-black/20 px-7 font-condensed text-xl uppercase tracking-[0.06em] text-ink transition-colors hover:border-[#2E7D6B] hover:text-[#2E7D6B] sm:w-auto"
               >
                 Join
               </Link>
@@ -65,7 +65,7 @@ export default function Home() {
 
             <Link
               href="/solo"
-              className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-white/35 transition-colors hover:text-[#2E7D6B]"
+              className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-black/40 transition-colors hover:text-[#2E7D6B]"
             >
               Solo lab
             </Link>
@@ -77,7 +77,7 @@ export default function Home() {
           </div>
         </section>
 
-        <footer className="mt-10 hidden font-mono text-[0.58rem] uppercase tracking-[0.24em] text-white/25 lg:block">
+        <footer className="mt-10 hidden font-mono text-[0.58rem] uppercase tracking-[0.24em] text-black/30 lg:block">
           Soundclash · Musixmatch Musicathon 2026
         </footer>
       </main>

@@ -3,24 +3,35 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
-/* Soundclash — warm editorial surface: deep warm ink with faint, soft accent washes. */
+/* Soundclash — warm editorial surface: cream paper canvas with a faint printed
+   ink dot-grid and soft accent washes in the corners. */
 body {
-  background-color: #15120E;
+  background-color: #f4ecd8;
   background-image:
-    radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1.6px),
-    radial-gradient(60% 50% at 12% -5%, rgba(194, 86, 59, 0.08), transparent 70%),
-    radial-gradient(55% 45% at 100% 8%, rgba(46, 125, 107, 0.06), transparent 70%),
-    radial-gradient(50% 40% at 50% 110%, rgba(217, 154, 60, 0.05), transparent 70%);
+    radial-gradient(rgba(21, 18, 14, 0.04) 1px, transparent 1.6px),
+    radial-gradient(60% 50% at 12% -5%, rgba(194, 86, 59, 0.12), transparent 70%),
+    radial-gradient(55% 45% at 100% 8%, rgba(46, 125, 107, 0.09), transparent 70%),
+    radial-gradient(50% 40% at 50% 110%, rgba(217, 154, 60, 0.12), transparent 70%);
   background-size: 22px 22px, 100% 100%, 100% 100%, 100% 100%;
   background-attachment: fixed;
 }
 
 ::selection {
-  background: rgba(194, 86, 59, 0.35);
-  color: #fff;
+  background: rgba(194, 86, 59, 0.3);
+  color: #15120e;
+}
+
+/* Hide the scrollbar on a scroll container while keeping it scrollable — used by
+   the horizontal mini-game picker (the peeking cards + edge fade are the affordance). */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

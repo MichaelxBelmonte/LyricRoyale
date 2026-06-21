@@ -41,8 +41,8 @@ export default function Avatar({ name, emoji, size = "md", active = false }: Ava
         SIZES[size],
         emoji ? EMOJI_TEXT[size] : TEXT[size],
         active
-          ? "border-brand/60 bg-brand/10 text-brand-300"
-          : "border-neutral-800 bg-neutral-925 text-neutral-300",
+          ? "border-brand/60 bg-brand/10 text-brand"
+          : "border-black/10 bg-paper-sunken text-black/70",
       ].join(" ")}
       aria-hidden="true"
     >

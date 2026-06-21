@@ -34,13 +34,13 @@ export default function TeamBuilder({ initialTeam, labels, onSubmit }: TeamBuild
   return (
     <form
       onSubmit={submit}
-      className="rounded-lg border border-neutral-850 bg-neutral-950/80 p-4 shadow-2xl shadow-black/30 sm:p-6"
+      className="rounded-lg border border-black/10 bg-paper-raised p-4 shadow-2xl shadow-black/10 sm:p-6"
     >
-      <p className="text-xs font-semibold uppercase tracking-widest text-red-300">
+      <p className="text-xs font-semibold uppercase tracking-widest text-[#A2452E]">
         {labels.setupEyebrow}
       </p>
-      <h2 className="mt-2 text-2xl font-semibold text-white">{labels.setupTitle}</h2>
-      <p className="mt-2 text-sm leading-6 text-neutral-400">{labels.setupBody}</p>
+      <h2 className="mt-2 text-2xl font-semibold text-ink">{labels.setupTitle}</h2>
+      <p className="mt-2 text-sm leading-6 text-black/55">{labels.setupBody}</p>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
         <Field
@@ -74,7 +74,7 @@ export default function TeamBuilder({ initialTeam, labels, onSubmit }: TeamBuild
       <button
         type="submit"
         disabled={!hasArtist}
-        className="mt-5 h-12 w-full rounded-lg bg-red-600 px-5 font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:bg-neutral-800 disabled:text-neutral-500"
+        className="mt-5 h-12 w-full rounded-lg bg-[#C2563B] px-5 font-semibold text-white transition hover:bg-[#A2452E] disabled:cursor-not-allowed disabled:bg-black/[0.06] disabled:text-black/35"
       >
         {labels.startSession}
       </button>
@@ -95,12 +95,12 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-black/45">{label}</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="mt-2 h-12 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-4 text-white outline-none transition placeholder:text-neutral-600 focus:border-red-500 focus:ring-2 focus:ring-red-500/25"
+        className="mt-2 h-12 w-full rounded-lg border border-black/15 bg-white px-4 text-ink outline-none transition placeholder:text-black/35 focus:border-[#C2563B] focus:ring-2 focus:ring-[#C2563B]/25"
       />
     </label>
   );

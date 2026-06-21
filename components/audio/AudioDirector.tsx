@@ -55,6 +55,12 @@ export default function AudioDirector() {
   const [muted, setMuted] = useState(false);
   const volumeRef = useRef(BASE_VOLUME);
   const mutedRef = useRef(false);
+  // While the landing intro video plays, hold the soundtrack silent; it fades in
+  // only when the intro ends (see the `soundclash:intro` listener below).
+  const [introActive, setIntroActive] = useState(false);
+  const introActiveRef = useRef(false);
+  const fadeIntervalRef = useRef<number | null>(null);
+  const fadingRef = useRef(false);
 
   useEffect(() => {
     volumeRef.current = volume;
@@ -62,6 +68,9 @@ export default function AudioDirector() {
   useEffect(() => {
     mutedRef.current = muted;
   }, [muted]);
+  useEffect(() => {
+    introActiveRef.current = introActive;
+  }, [introActive]);
 
   const preferredIndex = useMemo(() => {
     const preferred = soundtrackForPath(pathname);
@@ -141,19 +150,41 @@ export default function AudioDirector() {
   }, []);
 
   const playAudio = useCallback(
-    async (userIntent = false) => {
+    async (userIntent = false, opts?: { fadeIn?: boolean }) => {
       const audio = audioRef.current;
       if (!audio) return;
       try {
         await ensureAnalyser();
-        audio.volume = effectiveVolume(volume, ducked, muted);
+        const target = effectiveVolume(volume, ducked, muted);
+        if (opts?.fadeIn) {
+          if (fadeIntervalRef.current != null) window.clearInterval(fadeIntervalRef.current);
+          fadingRef.current = true;
+          audio.volume = 0;
+        } else {
+          audio.volume = target;
+        }
         await audio.play();
         stoppedRef.current = false;
         if (userIntent) persistAudio({ stopped: false });
         setEnabled(true);
         setBlocked(false);
         startVisualizer();
+        if (opts?.fadeIn) {
+          // Gentle ~1.8s ramp 0 → target so the song never starts "a mille".
+          const steps = 30;
+          let i = 0;
+          fadeIntervalRef.current = window.setInterval(() => {
+            i += 1;
+            if (audioRef.current) audioRef.current.volume = clamp01(target * (i / steps));
+            if (i >= steps) {
+              if (fadeIntervalRef.current != null) window.clearInterval(fadeIntervalRef.current);
+              fadeIntervalRef.current = null;
+              fadingRef.current = false;
+            }
+          }, 1800 / steps);
+        }
       } catch {
+        fadingRef.current = false;
         setEnabled(false);
         setBlocked(true);
       } finally {
@@ -165,6 +196,11 @@ export default function AudioDirector() {
 
   const pauseAudio = useCallback(
     (userIntent = false) => {
+      if (fadeIntervalRef.current != null) {
+        window.clearInterval(fadeIntervalRef.current);
+        fadeIntervalRef.current = null;
+        fadingRef.current = false;
+      }
       audioRef.current?.pause();
       if (userIntent) {
         stoppedRef.current = true;
@@ -191,6 +227,17 @@ export default function AudioDirector() {
     if (typeof stored.volume === "number") setVolume(clamp01(stored.volume));
     if (typeof stored.muted === "boolean") setMuted(stored.muted);
     setTrackIndex(preferredIndex);
+    // Mirror BrandIntro's own skip conditions so the music holds during the intro
+    // without a mount-order race on the start event.
+    try {
+      const noIntro = new URLSearchParams(window.location.search).has("nointro");
+      if ((pathname ?? "/") === "/" && !noIntro && window.sessionStorage.getItem("sc_intro_seen") !== "1") {
+        introActiveRef.current = true;
+        setIntroActive(true);
+      }
+    } catch {
+      /* sessionStorage unavailable — no intro hold */
+    }
     setReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -210,7 +257,9 @@ export default function AudioDirector() {
     audio.src = track.src;
     audio.load();
     audio.volume = effectiveVolume(volume, ducked, muted);
-    if (enabledRef.current || !stoppedRef.current) void playAudioRef.current?.(false);
+    if (!introActiveRef.current && (enabledRef.current || !stoppedRef.current)) {
+      void playAudioRef.current?.(false);
+    }
     // Track loading must not depend on ducking; volume changes are handled below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, track.src]);
@@ -218,11 +267,12 @@ export default function AudioDirector() {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !ready) return;
+    if (fadingRef.current) return; // don't fight an in-progress fade-in
     audio.volume = effectiveVolume(volume, ducked, muted);
   }, [ducked, ready, volume, muted]);
 
   useEffect(() => {
-    if (!ready || enabled || stoppedRef.current) return;
+    if (!ready || enabled || stoppedRef.current || introActive) return;
     const retry = () => void playAudio(false);
     window.addEventListener("pointerdown", retry, { once: true });
     window.addEventListener("keydown", retry, { once: true });
@@ -230,7 +280,25 @@ export default function AudioDirector() {
       window.removeEventListener("pointerdown", retry);
       window.removeEventListener("keydown", retry);
     };
-  }, [enabled, playAudio, ready]);
+  }, [enabled, introActive, playAudio, ready]);
+
+  // Landing intro coordination: hold the soundtrack while the video plays, then
+  // fade it in when the intro ends (or is skipped). See BrandIntro.finish().
+  useEffect(() => {
+    const onIntro = (event: Event) => {
+      const phase = (event as CustomEvent<{ phase?: string }>).detail?.phase;
+      if (phase === "start") {
+        introActiveRef.current = true;
+        setIntroActive(true);
+      } else if (phase === "end") {
+        introActiveRef.current = false;
+        setIntroActive(false);
+        if (!stoppedRef.current) void playAudio(true, { fadeIn: true });
+      }
+    };
+    window.addEventListener("soundclash:intro", onIntro);
+    return () => window.removeEventListener("soundclash:intro", onIntro);
+  }, [playAudio]);
 
   useEffect(() => {
     const onDuck = (event: Event) => {
@@ -281,6 +349,7 @@ export default function AudioDirector() {
   useEffect(() => {
     return () => {
       stopVisualizer();
+      if (fadeIntervalRef.current != null) window.clearInterval(fadeIntervalRef.current);
       void audioContextRef.current?.close();
     };
   }, [stopVisualizer]);
@@ -296,7 +365,7 @@ export default function AudioDirector() {
           onClick={() => void (enabled ? pauseAudio(true) : playAudio(true))}
           aria-label={enabled ? "Pause soundtrack" : "Play soundtrack"}
           title={enabled ? "Pause soundtrack" : "Play soundtrack"}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-3 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-black/80 text-white shadow-[0_12px_28px_-14px_rgba(0,0,0,0.9)] backdrop-blur transition-transform hover:-translate-y-0.5 hover:border-[#2E7D6B]/70 active:translate-y-0 sm:right-5"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-3 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-black/15 bg-paper-raised/90 text-ink shadow-[0_12px_28px_-14px_rgba(0,0,0,0.9)] backdrop-blur transition-transform hover:-translate-y-0.5 hover:border-[#2E7D6B]/70 active:translate-y-0 sm:right-5"
         >
           <span className="sr-only">{track.title}</span>
           <Icon name={enabled ? "pause" : "play"} size={18} />

@@ -274,7 +274,7 @@ export default function SearchExperience() {
 
       <main className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6">
         {booting ? (
-          <div className="flex min-h-[50vh] items-center justify-center font-mono text-sm text-neutral-500">
+          <div className="flex min-h-[50vh] items-center justify-center font-mono text-sm text-black/45">
             {text.challengeLoading}…
           </div>
         ) : null}
@@ -282,7 +282,7 @@ export default function SearchExperience() {
         {!booting && screen === "onboarding" ? (
           <div className="mx-auto w-full max-w-2xl">
             {bootError ? (
-              <p className="mb-4 rounded-md border border-brand/30 bg-brand/5 px-4 py-3 text-sm text-brand-300">
+              <p className="mb-4 rounded-md border border-brand/30 bg-brand/10 px-4 py-3 text-sm text-brand">
                 {bootError}
               </p>
             ) : null}
@@ -356,18 +356,18 @@ export default function SearchExperience() {
                 onScored={handleScored}
               />
             ) : roundError ? (
-              <div className="rounded-lg border border-brand/30 bg-brand/5 p-6 text-center">
-                <p className="text-sm text-brand-300">{roundError}</p>
+              <div className="rounded-lg border border-brand/30 bg-brand/10 p-6 text-center">
+                <p className="text-sm text-brand">{roundError}</p>
                 <button
                   type="button"
                   onClick={backToLobby}
-                  className="mt-4 rounded-md border border-neutral-800 px-4 py-2 text-sm text-neutral-200 transition-colors hover:text-white"
+                  className="mt-4 rounded-md border border-black/15 px-4 py-2 text-sm text-black/70 transition-colors hover:text-ink"
                 >
                   {text.backLabel}
                 </button>
               </div>
             ) : (
-              <div className="flex min-h-[40vh] items-center justify-center font-mono text-sm text-neutral-500">
+              <div className="flex min-h-[40vh] items-center justify-center font-mono text-sm text-black/45">
                 {text.loadingRound}…
               </div>
             )}

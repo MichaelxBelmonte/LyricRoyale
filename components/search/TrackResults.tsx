@@ -35,18 +35,18 @@ export default function TrackResults({
 }: TrackResultsProps) {
   const isSelect = variant === "select";
   if (!searched) {
-    return <p className="text-sm text-neutral-500">{labels.emptyState}</p>;
+    return <p className="text-sm text-black/45">{labels.emptyState}</p>;
   }
 
   if (results.length === 0) {
-    return <p className="text-sm text-neutral-500">{labels.noResults}</p>;
+    return <p className="text-sm text-black/45">{labels.noResults}</p>;
   }
 
   return (
     <section aria-labelledby="search-results-title" className="space-y-3">
       <h2
         id="search-results-title"
-        className="font-mono text-xs uppercase tracking-[0.18em] text-neutral-500"
+        className="font-mono text-xs uppercase tracking-[0.18em] text-black/45"
       >
         {labels.resultsTitle}
       </h2>

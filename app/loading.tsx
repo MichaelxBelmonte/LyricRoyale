@@ -4,7 +4,7 @@
  */
 export default function Loading() {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-7 bg-[#15120E]">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-7 bg-paper">
       <div className="relative h-20 w-20">
         <span className="absolute inset-0 animate-spin rounded-full border-2 border-[#C2563B]/25 border-t-[#C2563B] [animation-duration:1.1s]" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -17,7 +17,7 @@ export default function Loading() {
       </div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/brand/wordmark.png" alt="Soundclash" className="h-6 w-auto opacity-90" />
-      <p className="animate-pulse font-mono text-[0.6rem] uppercase tracking-[0.32em] text-neutral-500">
+      <p className="animate-pulse font-mono text-[0.6rem] uppercase tracking-[0.32em] text-black/45">
         Loading the clash…
       </p>
     </div>

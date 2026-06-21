@@ -6,8 +6,8 @@ import Button from "@/components/brand/Button";
 import HomeLogo from "@/components/brand/HomeLogo";
 import JCard from "@/components/brand/JCard";
 import Sticker from "@/components/brand/Sticker";
+import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES } from "@/lib/game/languages";
 import type { PublicSessionState } from "@/lib/session/types";
-import type { Locale } from "@/lib/types";
 
 const FIELD =
   "mt-2 h-12 w-full rounded-lg border border-black/15 bg-white px-3 text-[#15120E] outline-none transition-colors placeholder:text-black/35 focus:border-[#C2563B] focus:shadow-[0_0_0_3px_rgba(194,86,59,0.15)]";
@@ -22,7 +22,7 @@ export default function CreateSession() {
   const router = useRouter();
   const [hostName, setHostName] = useState("Soundclash Host");
   const [voice, setVoice] = useState("hype");
-  const [locale, setLocale] = useState<Locale>("en");
+  const [language, setLanguage] = useState<string>(DEFAULT_LANGUAGE);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +34,7 @@ export default function CreateSession() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          locale,
+          language,
           hostName,
           voice: {
             preset: voice,
@@ -105,34 +105,20 @@ export default function CreateSession() {
             <p className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-black/45">
               Host language
             </p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {(
-                [
-                  ["en", "English"],
-                  ["it", "Italiano"],
-                ] as [Locale, string][]
-              ).map(([value, label]) => {
-                const selected = locale === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setLocale(value)}
-                    aria-pressed={selected}
-                    className={[
-                      "h-12 rounded-lg border px-3 font-condensed text-sm uppercase tracking-[0.04em] transition-colors",
-                      selected
-                        ? "border-[#C2563B] bg-[#C2563B]/10 text-[#A2452E]"
-                        : "border-black/15 bg-white text-black/70 hover:border-black/40 hover:text-black",
-                    ].join(" ")}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              aria-label="Host language"
+              className={`${FIELD} appearance-none text-base`}
+            >
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.nativeName}
+                </option>
+              ))}
+            </select>
             <p className="mt-1.5 text-xs text-black/50">
-              BEATBOT speaks and roasts in this language. You&rsquo;ll pick the mini-games next, in the room.
+              BEATBOT speaks and roasts in this language — any of {SUPPORTED_LANGUAGES.length} worldwide. You&rsquo;ll pick the mini-games next, in the room.
             </p>
           </div>
 

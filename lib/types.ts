@@ -65,6 +65,20 @@ export interface SearchResponse {
   results: TrackSummary[];
 }
 
+export interface GenreSummary {
+  id: number;
+  name: string;
+}
+
+export interface GenresResponse {
+  genres: GenreSummary[];
+}
+
+// Tracks pulled from an artist or a genre (feeds the host setlist deck).
+export interface TracksResponse {
+  results: TrackSummary[];
+}
+
 export interface TrackResponse {
   track: TrackSummary;
 }

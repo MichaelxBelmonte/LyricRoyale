@@ -17,7 +17,8 @@ const VARIANT_CLASS: Record<Variant, string> = {
   magenta:
     "shadow-[0_5px_0_rgba(0,0,0,0.28),0_16px_26px_-12px_rgba(194,86,59,0.6)] hover:-translate-y-0.5 active:translate-y-1 active:shadow-[0_1px_0_rgba(0,0,0,0.28)]",
   outlineDark: "border-2 border-black/25 text-black/80 hover:border-black hover:bg-black/[0.06]",
-  outlineLight: "border border-white/20 text-neutral-200 hover:border-white/50 hover:text-white",
+  // Quiet outline on the warm light canvas (was a light-on-dark outline pre-recolor).
+  outlineLight: "border border-black/15 text-black/60 hover:border-black/40 hover:text-ink",
 };
 
 const BASE =

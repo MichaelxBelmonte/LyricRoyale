@@ -1,3 +1,4 @@
+import type { BanterPack } from "@/lib/game/host-banter";
 import type { FinishLineDrop, Locale, TrackingLinks } from "@/lib/types";
 
 export type SessionStatus = "lobby" | "playing" | "results";
@@ -73,9 +74,20 @@ export interface PartySession {
   code: string;
   status: SessionStatus;
   locale: Locale;
+  // Narrator language code (any SUPPORTED_LANGUAGES code) — drives banter + TTS.
+  narratorLang: string;
+  // Localized narrator lines for this session's language.
+  banter: BanterPack;
   hostName: string;
   voice: HostVoiceConfig;
   miniGames: MiniGameId[];
+  // Shuffled play order for this session (a permutation of miniGames), so the
+  // mini-game sequence varies between sessions instead of following the fixed
+  // catalog order. playedGames tracks what actually ran, for no-repeat draws.
+  rotation: MiniGameId[];
+  playedGames: MiniGameId[];
+  // How many rounds the match runs (host-chosen: 3 / 6 / 9).
+  rounds: number;
   autopilot: boolean;
   trackPool: SessionTrackRef[];
   players: SessionPlayer[];
@@ -90,10 +102,13 @@ export interface PublicSessionState extends PartySession {
 
 export interface CreateSessionInput {
   locale?: Locale;
+  /** Narrator language code (any SUPPORTED_LANGUAGES code). */
+  language?: string;
   hostName?: string;
   voice?: Partial<HostVoiceConfig>;
   autopilot?: boolean;
   miniGames?: MiniGameId[];
+  rounds?: number;
 }
 
 export interface JoinSessionInput {

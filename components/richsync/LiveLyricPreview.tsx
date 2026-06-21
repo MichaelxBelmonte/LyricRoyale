@@ -75,7 +75,7 @@ export default function LiveLyricPreview({ trackId, enabled, labels }: LiveLyric
   }, [preview?.tracking.script]);
 
   return (
-    <section className="rounded-lg border border-neutral-850 bg-neutral-950/70 p-4 sm:p-5">
+    <section className="rounded-lg border border-black/10 bg-paper-raised p-4 sm:p-5">
       {preview?.tracking.pixel ? (
         <img alt="" className="hidden" referrerPolicy="no-referrer" src={preview.tracking.pixel} />
       ) : null}
@@ -86,35 +86,35 @@ export default function LiveLyricPreview({ trackId, enabled, labels }: LiveLyric
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand/70" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-brand" />
         </span>
-        <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">
+        <p className="text-xs font-semibold uppercase tracking-widest text-black/55">
           {labels.richsyncTitle}
         </p>
         </div>
       </div>
 
-      {loading ? <p className="mt-3 text-sm text-neutral-500">{labels.richsyncLoading}</p> : null}
-      {error ? <p className="mt-3 text-sm text-neutral-500">{error}</p> : null}
+      {loading ? <p className="mt-3 text-sm text-black/45">{labels.richsyncLoading}</p> : null}
+      {error ? <p className="mt-3 text-sm text-black/45">{error}</p> : null}
 
       {preview ? (
         <>
-          <p className="mt-4 text-xl font-semibold leading-9 text-white sm:text-2xl">
+          <p className="mt-4 text-xl font-semibold leading-9 text-ink sm:text-2xl">
             {preview.line.tokens.map((token, index) => (
               <span
                 key={`${token.offset}-${index}`}
                 className={[
                   "transition-colors duration-150",
                   index === activeIndex
-                    ? "text-brand-300"
+                    ? "text-brand"
                     : index < activeIndex
-                      ? "text-white"
-                      : "text-neutral-600",
+                      ? "text-ink"
+                      : "text-black/35",
                 ].join(" ")}
               >
                 {token.text}
               </span>
             ))}
           </p>
-          <p className="mt-4 text-xs leading-5 text-neutral-600">{preview.copyright}</p>
+          <p className="mt-4 text-xs leading-5 text-black/35">{preview.copyright}</p>
         </>
       ) : null}
     </section>

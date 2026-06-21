@@ -7,6 +7,8 @@ export interface MiniGameMeta {
   id: MiniGameId;
   name: string;
   blurb: string;
+  /** One-line in-card example that shows the mechanic at a glance. */
+  example: string;
   category: MiniGameCategory;
   /**
    * Optional raster art for the host picker card. When set, the card shows this
@@ -19,25 +21,28 @@ export interface MiniGameMeta {
 /** Category → display label + brand accent tone, used by the host picker cards. */
 export const CATEGORY_META: Record<
   MiniGameCategory,
-  { label: string; tone: "magenta" | "aqua" | "tangerine" }
+  { label: string; tagline: string; tone: "magenta" | "aqua" | "tangerine" }
 > = {
-  lyrics: { label: "Lyrics", tone: "magenta" },
-  trivia: { label: "Trivia", tone: "aqua" },
-  timing: { label: "Timing", tone: "tangerine" },
+  lyrics: { label: "Lyrics", tagline: "Know the words?", tone: "magenta" },
+  trivia: { label: "Trivia", tagline: "Know the tracks?", tone: "aqua" },
+  timing: { label: "Timing", tagline: "Got rhythm?", tone: "tangerine" },
 };
+
+// Categories in display order for the grouped picker.
+export const MINI_GAME_CATEGORIES: MiniGameCategory[] = ["lyrics", "trivia", "timing"];
 
 // Canonical catalog: single source of truth for rotation order AND the host
 // picker labels. Order here is the order the autopilot cycles through.
 export const MINI_GAME_CATALOG: MiniGameMeta[] = [
-  { id: "finish_line", name: "Finish the Line", blurb: "Tap the missing last word.", category: "lyrics" },
-  { id: "mondegreen", name: "Misheard", blurb: "Spot the real lyric among the mondegreens.", category: "lyrics" },
-  { id: "the_drop", name: "The Drop", blurb: "Hit the word as the lyric lands.", category: "timing" },
-  { id: "on_beat", name: "On The Beat", blurb: "Lock the word right as the beat hits — timing scores.", category: "timing" },
-  { id: "song_mash", name: "Who Said It", blurb: "Which track dropped this line?", category: "trivia" },
-  { id: "next_line", name: "Next Line", blurb: "Pick the line that comes next.", category: "lyrics" },
-  { id: "name_song", name: "Name That Song", blurb: "Match the lyric to its track.", category: "trivia" },
-  { id: "artist_pick", name: "Artist Lock", blurb: "Pick the artist behind the lyric.", category: "trivia" },
-  { id: "word_rush", name: "Word Rush", blurb: "Pick the recurring keyword.", category: "timing" },
+  { id: "finish_line", name: "Finish the Line", blurb: "Tap the missing last word.", example: "“…and I will always love ___”", category: "lyrics", image: "/games/finish_line.png" },
+  { id: "mondegreen", name: "Misheard", blurb: "Spot the real lyric among the mondegreens.", example: "“Hold me closer, Tony Danza” — real or misheard?", category: "lyrics", image: "/games/mondegreen.png" },
+  { id: "the_drop", name: "The Drop", blurb: "Hit the word as the lyric lands.", example: "tap ▶ right on the drop", category: "timing", image: "/games/the_drop.png" },
+  { id: "on_beat", name: "On The Beat", blurb: "Lock the word right as the beat hits — timing scores.", example: "lock the word on the beat", category: "timing", image: "/games/on_beat.png" },
+  { id: "song_mash", name: "Who Said It", blurb: "Which track dropped this line?", example: "“…” → which song?", category: "trivia", image: "/games/song_mash.png" },
+  { id: "next_line", name: "Next Line", blurb: "Pick the line that comes next.", example: "pick the line that comes next", category: "lyrics", image: "/games/next_line.png" },
+  { id: "name_song", name: "Name That Song", blurb: "Match the lyric to its track.", example: "match the lyric to its title", category: "trivia", image: "/games/name_song.png" },
+  { id: "artist_pick", name: "Artist Lock", blurb: "Pick the artist behind the lyric.", example: "“…” → whose lyric?", category: "trivia", image: "/games/artist_pick.png" },
+  { id: "word_rush", name: "Word Rush", blurb: "Pick the recurring keyword.", example: "spot the word that repeats most", category: "timing", image: "/games/word_rush.png" },
 ];
 
 // Façade-only entries shown in the host gallery as "Coming soon". They are NOT

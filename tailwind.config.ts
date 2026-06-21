@@ -22,6 +22,16 @@ const config: Config = {
         // Soundclash — exact palette sampled from the brand mood board.
         ink: "#15120E",
         cream: "#F4ECD8",
+        // Warm light surfaces for the editorial theme. `paper` is the app canvas
+        // (cream), `raised` lifts cards/panels above it, `sunken` is for recessed
+        // secondary fills. Defined as real tokens (not arbitrary values) so the
+        // Tailwind JIT emits them reliably.
+        paper: {
+          DEFAULT: "#F4ECD8",
+          raised: "#FBF6EA",
+          sunken: "#EADFC4",
+          line: "#E3D5B6",
+        },
         chrome: { DEFAULT: "#aab0ba", light: "#d8dee6", dark: "#838b97" },
         yellow: { DEFAULT: "#ffd400", 400: "#ffdd33" },
         brand: {

@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "Soundclash",
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
   },
   openGraph: {
     title: "Soundclash",
@@ -70,7 +70,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#15120E",
+  themeColor: "#F4ECD8",
   width: "device-width",
   initialScale: 1,
   // Draw under the notch/home-indicator so env(safe-area-inset-*) becomes active.
@@ -83,7 +83,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="en"
       className={`${sans.variable} ${mono.variable} ${condensed.variable} ${marker.variable}`}
     >
-      <body className="min-h-[100dvh] bg-[#15120E] font-sans text-neutral-100 antialiased">
+      <body className="min-h-[100dvh] bg-paper font-sans text-ink antialiased">
         {children}
         <AudioDirector />
       </body>

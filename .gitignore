@@ -40,3 +40,6 @@ pnpm-debug.log*
 *.mp4
 *.mov
 !public/**
+
+# ...ma mai i .DS_Store, neanche sotto public/ (l'eccezione qui sopra li ri-includeva)
+.DS_Store

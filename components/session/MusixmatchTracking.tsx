@@ -49,7 +49,7 @@ export function MusixmatchCredit({
   return (
     <>
       <MusixmatchTracking roundKey={roundKey} tracking={tracking} />
-      <p className={className ?? "mt-6 text-xs leading-5 text-neutral-500"}>{copyright}</p>
+      <p className={className ?? "mt-6 text-xs leading-5 text-black/45"}>{copyright}</p>
     </>
   );
 }

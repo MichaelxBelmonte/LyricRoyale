@@ -34,9 +34,9 @@ export const SOUNDTRACKS: Soundtrack[] = [
   },
 ];
 
-export function soundtrackForPath(pathname: string | null): SoundtrackId {
-  const path = pathname ?? "/";
-  if (path.startsWith("/host/") && path !== "/host/new") return "clash";
-  if (path.startsWith("/player/") || path.startsWith("/solo")) return "clash";
+// One soundtrack everywhere: the "Soundclash Signal" theme (the one you start from
+// the home "Play theme"). The room/round no longer swaps to a different track, so the
+// music stays continuous across navigation. `pathname` is kept for signature stability.
+export function soundtrackForPath(_pathname: string | null): SoundtrackId {
   return "signal";
 }

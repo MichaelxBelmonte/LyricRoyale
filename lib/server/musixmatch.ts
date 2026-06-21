@@ -1,6 +1,13 @@
 import "server-only";
 
-import type { RichsyncLine, RichsyncPreview, RichsyncToken, TrackingLinks, TrackSummary } from "@/lib/types";
+import type {
+  GenreSummary,
+  RichsyncLine,
+  RichsyncPreview,
+  RichsyncToken,
+  TrackingLinks,
+  TrackSummary,
+} from "@/lib/types";
 
 const BASE = "https://api.musixmatch.com/ws/1.1";
 
@@ -24,6 +31,17 @@ interface RawTrack {
 interface SearchBody {
   track_list?: Array<{
     track?: RawTrack;
+  }>;
+}
+
+interface RawGenre {
+  music_genre_id?: number | string;
+  music_genre_name?: string;
+}
+
+interface GenresBody {
+  music_genre_list?: Array<{
+    music_genre?: RawGenre;
   }>;
 }
 
@@ -162,6 +180,56 @@ export async function searchTracks(query: string, limit = 8): Promise<TrackSumma
     f_has_lyrics: 1,
   });
 
+  return (body.track_list ?? [])
+    .map((item) => toTrackSummary(item.track))
+    .filter((track): track is TrackSummary => track !== null);
+}
+
+// Top tracks for an artist name (the "by artist" music source). q_artist +
+// rating sort surfaces the well-known artist's hits first; artist.search itself
+// is too noisy ("Queen" → "Queen Queen"), so we go straight to their tracks.
+export async function searchTracksByArtist(artist: string, limit = 8): Promise<TrackSummary[]> {
+  const body = await callMusixmatch<SearchBody>("track.search", {
+    q_artist: artist,
+    page_size: limit,
+    s_track_rating: "desc",
+    f_has_lyrics: 1,
+  });
+  return (body.track_list ?? [])
+    .map((item) => toTrackSummary(item.track))
+    .filter((track): track is TrackSummary => track !== null);
+}
+
+// Catalog of music genres (cached — it never changes within a process).
+let genreCache: GenreSummary[] | null = null;
+export async function getGenres(): Promise<GenreSummary[]> {
+  if (genreCache) return genreCache;
+  const body = await callMusixmatch<GenresBody>("music.genres.get", {});
+  const seen = new Set<number>();
+  const genres = (body.music_genre_list ?? [])
+    .map((item) => {
+      const raw = item.music_genre;
+      const id = typeof raw?.music_genre_id === "number" ? raw.music_genre_id : Number(raw?.music_genre_id);
+      const name = raw?.music_genre_name?.trim();
+      return Number.isFinite(id) && name ? { id, name } : null;
+    })
+    .filter((genre): genre is GenreSummary => {
+      if (!genre || seen.has(genre.id)) return false;
+      seen.add(genre.id);
+      return true;
+    });
+  genreCache = genres;
+  return genres;
+}
+
+// Top rating-sorted tracks within a genre (for the "by genre" music source).
+export async function getGenreTracks(genreId: number, limit = 8): Promise<TrackSummary[]> {
+  const body = await callMusixmatch<SearchBody>("track.search", {
+    f_music_genre_id: genreId,
+    page_size: limit,
+    s_track_rating: "desc",
+    f_has_lyrics: 1,
+  });
   return (body.track_list ?? [])
     .map((item) => toTrackSummary(item.track))
     .filter((track): track is TrackSummary => track !== null);

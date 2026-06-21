@@ -38,7 +38,8 @@ export interface SpeechInput {
   text: string;
   preset?: HostVoicePreset;
   voiceId?: string;
-  languageCode?: "en" | "it";
+  // Any language code supported by eleven_multilingual_v2 (see lib/game/languages.ts).
+  languageCode?: string;
 }
 
 export interface MusicInput {

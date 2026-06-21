@@ -186,7 +186,7 @@ export default function FinishLineGame({
   const primaryAction = isEncore ? labels.viewResult : labels.nextRound;
 
   return (
-    <section className="tx-grain tx-grain-dark relative animate-pop-in overflow-hidden rounded-2xl border border-white/10 bg-[#0e0e10] p-4 shadow-[0_20px_60px_-24px_rgba(194,86,59,0.35)] sm:p-6">
+    <section className="tx-grain relative animate-pop-in overflow-hidden rounded-2xl border border-black/10 bg-paper-raised p-4 shadow-[0_20px_60px_-24px_rgba(194,86,59,0.35)] sm:p-6">
       {round.tracking.pixel ? (
         <img alt="" className="hidden" referrerPolicy="no-referrer" src={round.tracking.pixel} />
       ) : null}
@@ -194,7 +194,7 @@ export default function FinishLineGame({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#C2563B]/40 bg-[#C2563B]/10 px-3 py-1 font-mono text-[0.65rem] uppercase tracking-[0.2em] text-[#E0967F]">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#C2563B]/40 bg-[#C2563B]/10 px-3 py-1 font-mono text-[0.65rem] uppercase tracking-[0.2em] text-brand">
               ◉ {labels.roundTitle}
             </span>
             {isEncore ? (
@@ -203,10 +203,10 @@ export default function FinishLineGame({
               </Sticker>
             ) : null}
           </div>
-          <h2 className="mt-2 truncate text-xl font-bold text-white sm:text-2xl">{track.trackName}</h2>
-          <p className="truncate text-sm text-neutral-400">{track.artistName}</p>
+          <h2 className="mt-2 truncate text-xl font-bold text-ink sm:text-2xl">{track.trackName}</h2>
+          <p className="truncate text-sm text-black/55">{track.artistName}</p>
           {isEncore ? (
-            <p className="mt-1 text-xs font-medium text-brand-300">{labels.encoreTagline}</p>
+            <p className="mt-1 text-xs font-medium text-brand">{labels.encoreTagline}</p>
           ) : null}
         </div>
         <div className="grid grid-cols-3 gap-2">
@@ -219,11 +219,11 @@ export default function FinishLineGame({
       <HeatMeter streak={streak} result={result} labels={labels} />
 
       {ghost ? (
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-neutral-850 bg-neutral-950 px-3 py-2">
-          <span className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-neutral-500">
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-black/10 bg-black/[0.04] px-3 py-2">
+          <span className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-black/45">
             {labels.rivalLabel}
           </span>
-          <div className="flex items-center gap-3 font-mono text-sm tabular-nums text-neutral-300">
+          <div className="flex items-center gap-3 font-mono text-sm tabular-nums text-black/70">
             <span>{(ghost.elapsedMs / 1000).toFixed(1)}s</span>
             <span>
               {ghost.points} {labels.pointsLabel}
@@ -232,10 +232,10 @@ export default function FinishLineGame({
               <span
                 className={
                   result.breakdown.total > ghost.points
-                    ? "text-emerald-300"
+                    ? "text-aqua"
                     : result.breakdown.total < ghost.points
-                      ? "text-brand-300"
-                      : "text-neutral-400"
+                      ? "text-brand"
+                      : "text-black/55"
                 }
               >
                 {result.breakdown.total > ghost.points
@@ -253,14 +253,14 @@ export default function FinishLineGame({
         <div className="flex items-center justify-between gap-3">
           <span
             className={`font-mono text-xs font-medium uppercase tracking-[0.15em] ${
-              timeDanger && !result ? "text-[#E0967F]" : "text-neutral-500"
+              timeDanger && !result ? "text-brand" : "text-black/45"
             }`}
           >
             {labels.timeRemainingLabel}
           </span>
           <Led value={`${(remainingMs / 1000).toFixed(1)}s`} danger={timeDanger && !result} />
         </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-850">
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/[0.04]">
           <div
             className={[
               "h-full rounded-full transition-[width] duration-100",
@@ -309,7 +309,7 @@ export default function FinishLineGame({
           disabled={result !== null || pending}
           autoComplete="off"
           placeholder={labels.answerPlaceholder}
-          className="h-12 rounded-lg border border-neutral-800 bg-neutral-950 px-4 text-base text-white outline-none transition-all placeholder:text-neutral-600 focus:border-[#C2563B] focus:shadow-[0_0_0_3px_rgba(194,86,59,0.2)] disabled:opacity-70"
+          className="h-12 rounded-lg border border-black/10 bg-white px-4 text-base text-ink outline-none transition-all placeholder:text-black/35 focus:border-[#C2563B] focus:shadow-[0_0_0_3px_rgba(194,86,59,0.2)] disabled:opacity-70"
         />
         <Button type="submit" disabled={result !== null || pending}>
           {labels.submitAnswer}
@@ -320,7 +320,7 @@ export default function FinishLineGame({
         <div
           className={[
             "mt-4 animate-pop-in rounded-md border p-4",
-            result.correct ? "border-emerald-500/30 bg-emerald-500/5" : "border-brand/30 bg-brand/5",
+            result.correct ? "border-aqua/30 bg-aqua/10" : "border-brand/30 bg-brand/10",
           ].join(" ")}
         >
           {result.correct ? (
@@ -344,8 +344,8 @@ export default function FinishLineGame({
         </div>
       ) : null}
 
-      <div className="mt-6 flex flex-wrap items-end justify-between gap-4 border-t border-neutral-850 pt-4">
-        <p className="max-w-md text-xs leading-5 text-neutral-500">{round.copyright}</p>
+      <div className="mt-6 flex flex-wrap items-end justify-between gap-4 border-t border-black/10 pt-4">
+        <p className="max-w-md text-xs leading-5 text-black/45">{round.copyright}</p>
         <div className="flex shrink-0 gap-3">
           {result ? (
             <button
@@ -359,7 +359,7 @@ export default function FinishLineGame({
           <button
             type="button"
             onClick={onReset}
-            className="rounded-md border border-neutral-800 px-4 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-700 hover:text-white"
+            className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium text-black/70 transition-colors hover:border-black/25 hover:text-ink"
           >
             {labels.resetRound}
           </button>
@@ -445,14 +445,14 @@ function HeatMeter({
       className={[
         "mt-5 rounded-xl border px-4 py-3 transition-colors",
         broken
-          ? "animate-flash-out border-neutral-800 bg-neutral-950"
+          ? "animate-flash-out border-black/10 bg-black/[0.04]"
           : hot
-            ? "border-[#C2563B]/60 bg-[#C2563B]/5"
-            : "border-neutral-850 bg-neutral-950",
+            ? "border-[#C2563B]/60 bg-[#C2563B]/10"
+            : "border-black/10 bg-black/[0.04]",
       ].join(" ")}
     >
       <div className="flex items-center justify-between gap-3">
-        <p className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-neutral-400">
+        <p className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-black/55">
           {labels.heatLabel} {hot && !broken ? "🔥" : ""}
         </p>
         <div className="flex items-center gap-2">
@@ -464,20 +464,20 @@ function HeatMeter({
           <span
             className={[
               "font-mono text-2xl tabular-nums",
-              broken ? "text-neutral-600" : hot ? "text-[#E0967F]" : "text-white",
+              broken ? "text-black/35" : hot ? "text-brand" : "text-ink",
             ].join(" ")}
           >
             ×{formatMultiplier(multiplier)}
           </span>
         </div>
       </div>
-      <div className="mt-2 h-3 overflow-hidden rounded-full border border-black/40 bg-neutral-900">
+      <div className="mt-2 h-3 overflow-hidden rounded-full border border-black/10 bg-black/[0.06]">
         <div
           className="h-full rounded-full bg-gradient-to-r from-[#2E7D6B] via-[#E2A85C] to-[#C2563B] transition-[width] duration-300"
           style={{ width: `${segments === 0 ? 0 : Math.max(8, (segments / MAX_HEAT) * 100)}%` }}
         />
       </div>
-      <p className="mt-1.5 truncate font-mono text-[0.6rem] uppercase tracking-[0.15em] text-neutral-500">
+      <p className="mt-1.5 truncate font-mono text-[0.6rem] uppercase tracking-[0.15em] text-black/45">
         {broken ? labels.comboBreak : labels.heatOnHit}
       </p>
     </div>
@@ -493,15 +493,15 @@ function HostBubble({ result }: { result: RoundResult | null }) {
       : "Ooh, not even close — shake it off."
     : "Lock in and finish the line!";
   return (
-    <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#2E7D6B]/30 bg-[#2E7D6B]/[0.06] px-3 py-2.5">
+    <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#2E7D6B]/30 bg-[#2E7D6B]/[0.10] px-3 py-2.5">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#D99A3C] to-[#C2563B] text-sm shadow-[0_4px_14px_-4px_rgba(194,86,59,0.7)]">
         🎙️
       </span>
       <p className="min-w-0">
-        <span className="block font-mono text-[0.55rem] uppercase tracking-[0.22em] text-[#86BDB0]">
+        <span className="block font-mono text-[0.55rem] uppercase tracking-[0.22em] text-aqua">
           AI Host · Beatbot
         </span>
-        <span className="mt-0.5 block truncate text-sm text-neutral-200">{line}</span>
+        <span className="mt-0.5 block truncate text-sm text-ink">{line}</span>
       </p>
     </div>
   );
@@ -522,17 +522,17 @@ function ScoreChain({
   if (breakdown.encore > 1) factors.push(`×${breakdown.encore}`);
 
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm tabular-nums text-neutral-400">
-      <span className="text-neutral-300">{breakdown.subtotal}</span>
+    <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm tabular-nums text-black/55">
+      <span className="text-black/70">{breakdown.subtotal}</span>
       {factors.map((factor, index) => (
-        <span key={index} className="text-brand-300">
+        <span key={index} className="text-brand">
           {factor}
         </span>
       ))}
-      <span className="text-neutral-600">=</span>
-      <span className="text-lg text-white">
+      <span className="text-black/35">=</span>
+      <span className="text-lg text-ink">
         {animatedTotal}
-        <span className="ml-1 text-xs text-neutral-500">{labels.pointsLabel}</span>
+        <span className="ml-1 text-xs text-black/45">{labels.pointsLabel}</span>
       </span>
     </div>
   );
@@ -570,13 +570,13 @@ function Stat({
   suffix?: string;
 }) {
   return (
-    <div className="min-w-0 rounded-md border border-neutral-850 bg-neutral-950 px-3 py-2 text-right">
-      <p className="truncate font-mono text-[0.6rem] uppercase tracking-[0.18em] text-neutral-500">
+    <div className="min-w-0 rounded-md border border-black/10 bg-black/[0.04] px-3 py-2 text-right">
+      <p className="truncate font-mono text-[0.6rem] uppercase tracking-[0.18em] text-black/45">
         {label}
       </p>
-      <p className="mt-1 truncate font-mono text-xl tabular-nums text-white">
+      <p className="mt-1 truncate font-mono text-xl tabular-nums text-ink">
         {value}
-        {suffix ? <span className="ml-1 text-sm text-neutral-500">{suffix}</span> : null}
+        {suffix ? <span className="ml-1 text-sm text-black/45">{suffix}</span> : null}
       </p>
     </div>
   );

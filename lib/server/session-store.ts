@@ -13,6 +13,8 @@ import {
 } from "@/lib/game/finish-line";
 import { ROUND_TIME_LIMIT_MS, scoreFinishLine, scoreRound } from "@/lib/game/scoring";
 import { getRichsyncLines, getTrackLyrics } from "@/lib/server/musixmatch";
+import { DEFAULT_BANTER_PACK, staticBanterPack, type BanterPack } from "@/lib/game/host-banter";
+import { normalizeLanguage } from "@/lib/game/languages";
 import { avatarForIndex, isPlayerAvatar } from "@/lib/session/avatars";
 import { ALL_MINI_GAME_IDS, orderMiniGames } from "@/lib/session/mini-games";
 import type { FinishLineDrop, Locale, TrackSummary } from "@/lib/types";
@@ -37,6 +39,26 @@ const DEFAULT_VOICE: HostVoiceConfig = {
 };
 
 const DEFAULT_MINI_GAMES: MiniGameId[] = ALL_MINI_GAME_IDS;
+
+// Host-selectable match lengths. Anything else normalizes to the default.
+const ALLOWED_ROUNDS = [3, 6, 9];
+const DEFAULT_ROUNDS = 6;
+function clampRounds(value: unknown): number {
+  const n = Number(value);
+  return ALLOWED_ROUNDS.includes(n) ? n : DEFAULT_ROUNDS;
+}
+
+// Fisher–Yates shuffle (server-side; Math.random is fine here). Used once per
+// session to randomize the mini-game play order so two shows don't run the
+// identical canonical sequence.
+function shuffle<T>(items: readonly T[]): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
 type Store = Map<string, PartySession>;
 
@@ -94,10 +116,15 @@ function publicState(session: PartySession): PublicSessionState {
 export function createSession(input: CreateSessionInput = {}): PublicSessionState {
   const createdAt = now();
   const requestedGames = orderMiniGames(input.miniGames ?? []);
+  const narratorLang = normalizeLanguage(input.language ?? input.locale);
   const session: PartySession = {
     code: code(),
     status: "lobby",
-    locale: input.locale === "it" ? "it" : ("en" satisfies Locale),
+    locale: narratorLang === "it" ? "it" : ("en" satisfies Locale),
+    narratorLang,
+    // Static pack for en/it (instant); the POST /api/sessions route swaps in a
+    // Claude-generated pack for other languages before the host gets the room.
+    banter: staticBanterPack(narratorLang) ?? DEFAULT_BANTER_PACK,
     hostName: input.hostName?.trim() || "Host",
     voice: {
       ...DEFAULT_VOICE,
@@ -105,6 +132,9 @@ export function createSession(input: CreateSessionInput = {}): PublicSessionStat
       label: input.voice?.label?.trim() || DEFAULT_VOICE.label,
     },
     miniGames: requestedGames.length ? requestedGames : DEFAULT_MINI_GAMES,
+    rotation: shuffle(requestedGames.length ? requestedGames : DEFAULT_MINI_GAMES),
+    playedGames: [],
+    rounds: clampRounds(input.rounds),
     autopilot: input.autopilot ?? true,
     trackPool: [],
     players: [],
@@ -118,6 +148,13 @@ export function createSession(input: CreateSessionInput = {}): PublicSessionStat
 
 export function getSession(sessionCode: string): PublicSessionState {
   return publicState(assertSession(sessionCode));
+}
+
+// Attach the resolved (possibly Claude-generated) narrator banter pack to a
+// session after creation. No-op if the session has since vanished.
+export function setSessionBanter(sessionCode: string, banter: BanterPack): void {
+  const session = sessions.get(cleanCode(sessionCode));
+  if (session) session.banter = banter;
 }
 
 export function joinSession(sessionCode: string, input: JoinSessionInput = {}) {
@@ -168,12 +205,38 @@ function cleanDeck(deck: SessionTrackRef[] | undefined): SessionTrackRef[] {
 
 const NEEDS_RICHSYNC = new Set<MiniGameId>(["the_drop", "on_beat"]);
 
+// A game is playable on a given track only if its richsync requirement is met.
+// (the_drop / on_beat need word-level timing data, which most tracks lack.)
+function isPlayable(game: MiniGameId, hasRichsync: boolean): boolean {
+  return !NEEDS_RICHSYNC.has(game) || hasRichsync;
+}
+
+// Pick the next mini-game for an autopilot round. Draws from the session's
+// shuffled rotation WITHOUT replacement within a cycle, so the 6-round set is
+// varied and (with ≥6 games selected) never repeats. When the chosen game needs
+// richsync the current track lacks, it substitutes the next *playable, unused*
+// game rather than collapsing every such slot onto "finish_line".
 function nextMiniGame(session: PartySession, requested: MiniGameId | undefined, hasRichsync: boolean): MiniGameId {
-  if (requested) return NEEDS_RICHSYNC.has(requested) && !hasRichsync ? "finish_line" : requested;
-  const nextIndex = session.currentRound?.index ?? 0;
-  const cycle = session.miniGames.length ? session.miniGames : DEFAULT_MINI_GAMES;
-  const selected = cycle[nextIndex % cycle.length];
-  return NEEDS_RICHSYNC.has(selected) && !hasRichsync ? "finish_line" : selected;
+  // Manual override: honor the host's pick (degrading only on richsync mismatch).
+  if (requested) return isPlayable(requested, hasRichsync) ? requested : "finish_line";
+
+  const rotation = session.rotation.length ? session.rotation : DEFAULT_MINI_GAMES;
+  const cycleLen = rotation.length;
+  const lastGame = session.currentRound?.miniGame;
+  // Games already played in the current cycle (one cycle = one full pass through
+  // the rotation). With ≥6 games selected and 6 rounds we never wrap, so this is
+  // simply "everything played so far" → no repeats across the whole show.
+  const played = session.playedGames;
+  const cycleStart = Math.floor(played.length / cycleLen) * cycleLen;
+  const usedThisCycle = new Set<MiniGameId>(played.slice(cycleStart));
+
+  return (
+    rotation.find((g) => isPlayable(g, hasRichsync) && !usedThisCycle.has(g) && g !== lastGame) ??
+    rotation.find((g) => isPlayable(g, hasRichsync) && !usedThisCycle.has(g)) ??
+    rotation.find((g) => isPlayable(g, hasRichsync) && g !== lastGame) ??
+    rotation.find((g) => isPlayable(g, hasRichsync)) ??
+    "finish_line"
+  );
 }
 
 function labelsFor(miniGame: MiniGameId) {
@@ -424,18 +487,30 @@ export async function startRound(sessionCode: string, input: StartRoundInput): P
   }
 
   const startedAt = now();
-  const miniGame = nextMiniGame(session, input.auto ? undefined : input.miniGame, track.hasRichsync === true);
+  const hasRichsync = track.hasRichsync === true;
+  const miniGame = nextMiniGame(session, input.auto ? undefined : input.miniGame, hasRichsync);
   const seed = Math.max(0, session.currentRound?.index ?? 0);
   let round: SessionRound;
   try {
     round = await buildSessionRound({ session, track, miniGame, seed, startedAt });
   } catch (err) {
     if (miniGame === "finish_line") throw err;
-    round = await buildSessionRound({ session, track, miniGame: "finish_line", seed: seed + 101, startedAt });
+    // Build failed (e.g. too small a track pool for a trivia round). Try one
+    // different playable game before collapsing to finish_line, to keep variety.
+    const alt = session.rotation.find(
+      (g) => g !== miniGame && g !== "finish_line" && isPlayable(g, hasRichsync),
+    );
+    try {
+      if (!alt) throw err;
+      round = await buildSessionRound({ session, track, miniGame: alt, seed: seed + 101, startedAt });
+    } catch {
+      round = await buildSessionRound({ session, track, miniGame: "finish_line", seed: seed + 202, startedAt });
+    }
   }
 
   session.status = "playing";
   session.currentRound = round;
+  session.playedGames.push(round.miniGame);
   session.updatedAt = startedAt;
   return publicState(session);
 }
@@ -505,7 +580,20 @@ export function revealRound(sessionCode: string): PublicSessionState {
 export function setMiniGames(sessionCode: string, ids: MiniGameId[]): PublicSessionState {
   const session = assertSession(sessionCode);
   const ordered = orderMiniGames(ids ?? []);
-  if (ordered.length) session.miniGames = ordered;
+  if (ordered.length) {
+    session.miniGames = ordered;
+    // Re-shuffle the rotation to match the new selection, and reset the
+    // played-this-cycle tracking so the next match draws cleanly.
+    session.rotation = shuffle(ordered);
+    session.playedGames = [];
+  }
+  session.updatedAt = now();
+  return publicState(session);
+}
+
+export function setSessionRounds(sessionCode: string, rounds: number): PublicSessionState {
+  const session = assertSession(sessionCode);
+  session.rounds = clampRounds(rounds);
   session.updatedAt = now();
   return publicState(session);
 }
