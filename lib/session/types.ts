@@ -1,3 +1,4 @@
+import type { DifficultyFloor, DifficultyTier } from "@/lib/game/difficulty";
 import type { BanterPack } from "@/lib/game/host-banter";
 import type { FinishLineDrop, Locale, TrackingLinks } from "@/lib/types";
 
@@ -57,6 +58,10 @@ export interface SessionRound {
   artistName: string;
   hasRichsync?: boolean;
   seed: number;
+  // Resolved difficulty tier for this round (drives option count, decoys, timer).
+  difficulty: DifficultyTier;
+  // Answering window for this round, in ms (varies by difficulty tier).
+  timeLimitMs: number;
   prompt: string;
   answerType: RoundAnswerType;
   options?: string[];
@@ -88,6 +93,13 @@ export interface PartySession {
   playedGames: MiniGameId[];
   // How many rounds the match runs (host-chosen: 3 / 6 / 9).
   rounds: number;
+  // Per-session entropy folded into every round's content seed, so two shows of
+  // the same deck never generate identical puzzles.
+  contentSeed: number;
+  // Host-chosen starting difficulty band; the per-match curve ramps up from here.
+  difficultyFloor: DifficultyFloor;
+  // Recently-used prompt keys (normalized lines) for cross-round anti-repetition.
+  usedPromptKeys: string[];
   autopilot: boolean;
   trackPool: SessionTrackRef[];
   players: SessionPlayer[];
@@ -109,6 +121,8 @@ export interface CreateSessionInput {
   autopilot?: boolean;
   miniGames?: MiniGameId[];
   rounds?: number;
+  /** Host-chosen starting difficulty band (1 chill / 2 standard / 3 brutal). */
+  difficultyFloor?: DifficultyFloor;
 }
 
 export interface JoinSessionInput {

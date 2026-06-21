@@ -49,6 +49,8 @@ export interface RoundScoreInput {
   isEncore?: boolean;
   /** |answerLockTime - dropTime| in ms from the line's karaoke start; null if no richsync. */
   dropProximityMs?: number | null;
+  /** Answering window for the speed bonus; defaults to ROUND_TIME_LIMIT_MS. */
+  timeLimitMs?: number;
 }
 
 export interface RoundScoreBreakdown {
@@ -69,7 +71,7 @@ export function scoreRound(input: RoundScoreInput): RoundScoreBreakdown {
   if (!input.isCorrect) {
     return { subtotal: 0, heat: 1, drop: 1, encore, total: 0 };
   }
-  const speedRatio = Math.max(0, 1 - input.elapsedMs / ROUND_TIME_LIMIT_MS);
+  const speedRatio = Math.max(0, 1 - input.elapsedMs / (input.timeLimitMs ?? ROUND_TIME_LIMIT_MS));
   const subtotal = BASE_POINTS + Math.round(SPEED_POINTS * speedRatio);
   const heat = heatMultiplier(input.streak);
   const drop = dropBonus(input.dropProximityMs ?? null);
@@ -82,6 +84,6 @@ export function scoreRound(input: RoundScoreInput): RoundScoreBreakdown {
  * Preserved so existing callers keep their exact behavior while the set/heat
  * loop is wired in; equivalent to scoreRound with streak=1 and no drop/encore.
  */
-export function scoreFinishLine(isCorrect: boolean, elapsedMs: number): number {
-  return scoreRound({ isCorrect, elapsedMs, streak: isCorrect ? 1 : 0 }).total;
+export function scoreFinishLine(isCorrect: boolean, elapsedMs: number, timeLimitMs?: number): number {
+  return scoreRound({ isCorrect, elapsedMs, streak: isCorrect ? 1 : 0, timeLimitMs }).total;
 }

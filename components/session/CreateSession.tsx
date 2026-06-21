@@ -18,10 +18,17 @@ const VOICES: [string, string][] = [
   ["diva", "Diva Host"],
 ];
 
+const DIFFICULTIES: [number, string][] = [
+  [1, "Chill"],
+  [2, "Standard"],
+  [3, "Brutal"],
+];
+
 export default function CreateSession() {
   const router = useRouter();
   const [hostName, setHostName] = useState("Soundclash Host");
   const [voice, setVoice] = useState("hype");
+  const [difficultyFloor, setDifficultyFloor] = useState<number>(2);
   const [language, setLanguage] = useState<string>(DEFAULT_LANGUAGE);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +43,7 @@ export default function CreateSession() {
         body: JSON.stringify({
           language,
           hostName,
+          difficultyFloor,
           voice: {
             preset: voice,
             label: voice === "judge" ? "Deadpan Judge" : voice === "diva" ? "Diva Host" : "Hype Host",
@@ -119,6 +127,36 @@ export default function CreateSession() {
             </select>
             <p className="mt-1.5 text-xs text-black/50">
               BEATBOT speaks and roasts in this language — any of {SUPPORTED_LANGUAGES.length} worldwide. You&rsquo;ll pick the mini-games next, in the room.
+            </p>
+          </div>
+
+          <div className="mt-5">
+            <p className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-black/45">
+              Difficulty
+            </p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              {DIFFICULTIES.map(([value, label]) => {
+                const selected = difficultyFloor === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setDifficultyFloor(value)}
+                    aria-pressed={selected}
+                    className={[
+                      "h-12 rounded-lg border px-3 font-condensed text-sm uppercase tracking-[0.04em] transition-colors",
+                      selected
+                        ? "border-[#C2563B] bg-[#C2563B]/10 text-[#A2452E]"
+                        : "border-black/15 bg-white text-black/70 hover:border-black/40 hover:text-black",
+                    ].join(" ")}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-xs text-black/50">
+              The match ramps up from here — gentle early rounds, hardest on the finale.
             </p>
           </div>
 

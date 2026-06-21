@@ -1,3 +1,4 @@
+import type { DecoySimilarity } from "@/lib/game/difficulty";
 import type { FinishLineDrop, FinishLineRound, RichsyncLine, TrackingLinks, TrackSummary } from "@/lib/types";
 
 const LAST_WORD = /([\p{L}\p{N}][\p{L}\p{N}'’-]*)([^\p{L}\p{N}]*)$/u;
@@ -81,6 +82,47 @@ function seededIndex(seed: number, size: number, salt = 0): number {
   return Math.abs(seed * 37 + salt * 17) % size;
 }
 
+// Fold several integers into one stable 32-bit seed (FNV-1a-ish). Used to mix the
+// per-session contentSeed with the round index + trackId so the same track at the
+// same round number yields a DIFFERENT puzzle in two different shows.
+export function mix(...parts: number[]): number {
+  let h = 2166136261 >>> 0;
+  for (const part of parts) {
+    h ^= Math.trunc(part) >>> 0;
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+
+// Levenshtein distance (small strings) — ranks "near-miss" distractors at higher
+// difficulty so the wrong options sit close to the real answer.
+function editDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  let curr = new Array<number>(n + 1);
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n];
+}
+
+// Drop items whose key is already used; if that empties the pool, keep the
+// original (never starve a round just to avoid a repeat).
+function dropExcluded<T>(items: T[], keyOf: (item: T) => string, exclude?: ReadonlySet<string>): T[] {
+  if (!exclude || exclude.size === 0) return items;
+  const kept = items.filter((item) => !exclude.has(keyOf(item)));
+  return kept.length > 0 ? kept : items;
+}
+
 function uniqueByNormalized(values: string[]): string[] {
   const seen = new Set<string>();
   return values.filter((value) => {
@@ -117,15 +159,28 @@ function playableFinishLines(lyrics: string[]): { line: string; answer: string }
     });
 }
 
-function choiceOptions(answer: string, candidates: string[], seed: number): string[] {
+function choiceOptions(
+  answer: string,
+  candidates: string[],
+  seed: number,
+  count = 4,
+  similarity: DecoySimilarity = "mixed",
+): string[] {
   const cleanAnswer = answer.trim();
-  const distractors = shuffled(
-    uniqueByNormalized([...candidates, ...FALLBACK_WORDS])
-      .filter((value) => normalizeAnswer(value) !== normalizeAnswer(cleanAnswer))
-      .filter((value) => normalizeAnswer(value).length >= 3),
-    seed,
-  ).slice(0, 3);
-  return shuffled(uniqueByNormalized([cleanAnswer, ...distractors]).slice(0, 4), seed + 7);
+  const pool = uniqueByNormalized([...candidates, ...FALLBACK_WORDS])
+    .filter((value) => normalizeAnswer(value) !== normalizeAnswer(cleanAnswer))
+    .filter((value) => normalizeAnswer(value).length >= 3);
+  // "near" = harder: distractors closest to the answer (small edit distance).
+  const ranked =
+    similarity === "near"
+      ? [...pool].sort(
+          (a, b) =>
+            editDistance(normalizeAnswer(a), normalizeAnswer(cleanAnswer)) -
+            editDistance(normalizeAnswer(b), normalizeAnswer(cleanAnswer)),
+        )
+      : shuffled(pool, seed);
+  const distractors = ranked.slice(0, Math.max(1, count - 1));
+  return shuffled(uniqueByNormalized([cleanAnswer, ...distractors]).slice(0, count), seed + 7);
 }
 
 export function normalizeAnswer(value: string): string {
@@ -142,17 +197,28 @@ export function buildFinishLineRound(input: {
   lyrics: string;
   copyright: string;
   tracking: TrackingLinks;
+  optionCount?: number;
+  decoySimilarity?: DecoySimilarity;
+  excludeKeys?: ReadonlySet<string>;
 }): { round: FinishLineRound; answer: string; line: string; options: string[] } {
   // Build the pool of lines that yield a valid last-word answer, so consecutive
   // seeds map to distinct playable rounds until the pool is exhausted.
-  const playable = playableFinishLines(lyricLines(input.lyrics));
+  const playableAll = playableFinishLines(lyricLines(input.lyrics));
 
-  if (playable.length === 0) throw new Error("No playable lyric lines found");
+  if (playableAll.length === 0) throw new Error("No playable lyric lines found");
 
+  // Anti-repetition: prefer lines not used recently this session.
+  const playable = dropExcluded(playableAll, (entry) => normalizeAnswer(entry.line), input.excludeKeys);
   const seed = Math.max(0, input.seed ?? 0);
   const index = seededIndex(seed, playable.length, input.trackId);
   const { line, answer } = playable[index];
-  const options = choiceOptions(answer, playable.map((entry) => entry.answer), seed + input.trackId);
+  const options = choiceOptions(
+    answer,
+    playableAll.map((entry) => entry.answer),
+    seed + input.trackId,
+    input.optionCount ?? 4,
+    input.decoySimilarity ?? "mixed",
+  );
 
   return {
     round: {
@@ -174,22 +240,36 @@ export function buildNextLineRound(input: {
   lyrics: string;
   copyright: string;
   tracking: TrackingLinks;
+  optionCount?: number;
+  decoySimilarity?: DecoySimilarity;
+  excludeKeys?: ReadonlySet<string>;
 }) {
   const lines = uniqueByNormalized(lyricLines(input.lyrics));
-  const pairs = lines
+  const allPairs = lines
     .slice(0, -1)
     .map((line, index) => ({ line, next: lines[index + 1] }))
     .filter((pair) => normalizeAnswer(pair.next).length >= 8);
 
-  if (pairs.length === 0) throw new Error("No playable next-line pairs found");
+  if (allPairs.length === 0) throw new Error("No playable next-line pairs found");
 
+  // Anti-repetition keys on the prompt line (matches what the caller stores).
+  const pairs = dropExcluded(allPairs, (pair) => normalizeAnswer(pair.line), input.excludeKeys);
   const seed = Math.max(0, input.seed ?? 0);
   const pair = pairs[seededIndex(seed, pairs.length, input.trackId)];
-  const distractors = shuffled(
-    lines.filter((line) => normalizeAnswer(line) !== normalizeAnswer(pair.next)),
-    seed + input.trackId,
-  ).slice(0, 3);
-  const options = shuffled([pair.next, ...distractors], seed + 13);
+  const optionCount = input.optionCount ?? 4;
+  const others = lines.filter((line) => normalizeAnswer(line) !== normalizeAnswer(pair.next));
+  // "near" = harder: distractors are lines that sit close to the answer in the song.
+  let pool: string[];
+  if (input.decoySimilarity === "near") {
+    const answerIdx = lines.findIndex((line) => normalizeAnswer(line) === normalizeAnswer(pair.next));
+    pool = [...others].sort(
+      (a, b) => Math.abs(lines.indexOf(a) - answerIdx) - Math.abs(lines.indexOf(b) - answerIdx),
+    );
+  } else {
+    pool = shuffled(others, seed + input.trackId);
+  }
+  const distractors = pool.slice(0, Math.max(1, optionCount - 1));
+  const options = shuffled(uniqueByNormalized([pair.next, ...distractors]).slice(0, optionCount), seed + 13);
 
   return {
     prompt: pair.line,
@@ -360,16 +440,19 @@ export function buildMondegreenRound(input: {
   lyrics: string;
   copyright: string;
   tracking: TrackingLinks;
+  excludeKeys?: ReadonlySet<string>;
 }) {
-  const lines = uniqueByNormalized(lyricLines(input.lyrics)).filter(
+  const allLines = uniqueByNormalized(lyricLines(input.lyrics)).filter(
     (line) => (line.match(WORD) ?? []).length >= 4,
   );
-  if (lines.length === 0) throw new Error("No playable mondegreen lines found");
+  if (allLines.length === 0) throw new Error("No playable mondegreen lines found");
 
+  // Anti-repetition on the real line (matches the key the caller stores).
+  const lines = dropExcluded(allLines, (line) => normalizeAnswer(line), input.excludeKeys);
   const seed = Math.max(0, input.seed ?? 0);
   const real = lines[seededIndex(seed, lines.length, input.trackId)];
-  const wordPool = lines.flatMap((line) => line.match(WORD) ?? []);
-  const lastWords = lines
+  const wordPool = allLines.flatMap((line) => line.match(WORD) ?? []);
+  const lastWords = allLines
     .map((line) => line.match(LAST_WORD)?.[1])
     .filter((word): word is string => Boolean(word));
 

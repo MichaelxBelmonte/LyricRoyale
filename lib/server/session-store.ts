@@ -9,8 +9,10 @@ import {
   buildSongMashRound,
   buildWordRushRound,
   computeDrop,
+  mix,
   normalizeAnswer,
 } from "@/lib/game/finish-line";
+import { clampFloor, resolveDifficulty, tierForRound } from "@/lib/game/difficulty";
 import { ROUND_TIME_LIMIT_MS, scoreFinishLine, scoreRound } from "@/lib/game/scoring";
 import { getRichsyncLines, getTrackLyrics } from "@/lib/server/musixmatch";
 import { DEFAULT_BANTER_PACK, staticBanterPack, type BanterPack } from "@/lib/game/host-banter";
@@ -135,6 +137,10 @@ export function createSession(input: CreateSessionInput = {}): PublicSessionStat
     rotation: shuffle(requestedGames.length ? requestedGames : DEFAULT_MINI_GAMES),
     playedGames: [],
     rounds: clampRounds(input.rounds),
+    // Per-session entropy so two shows of the same deck never match puzzle-for-puzzle.
+    contentSeed: (createdAt ^ Math.floor(Math.random() * 0xffffffff)) >>> 0,
+    difficultyFloor: clampFloor(input.difficultyFloor),
+    usedPromptKeys: [],
     autopilot: input.autopilot ?? true,
     trackPool: [],
     players: [],
@@ -294,6 +300,17 @@ function labelsFor(miniGame: MiniGameId) {
   };
 }
 
+// Stable key identifying the lyric line a round was built from, for cross-round
+// anti-repetition. Mirrors what each builder filters on (normalizeAnswer of the
+// source line): finish_line reconstructs the line from prompt + solution.
+function promptKeyFor(round: SessionRound): string {
+  if (round.miniGame === "mondegreen") return normalizeAnswer(round.solution ?? "");
+  if (round.miniGame === "finish_line" || round.miniGame === "the_drop" || round.miniGame === "on_beat") {
+    return normalizeAnswer((round.prompt ?? "").replace(/_{3,}/, round.solution ?? ""));
+  }
+  return normalizeAnswer(round.prompt ?? "");
+}
+
 async function buildSessionRound(input: {
   session: PartySession;
   track: SessionTrackRef;
@@ -303,8 +320,13 @@ async function buildSessionRound(input: {
 }): Promise<SessionRound> {
   const lyrics = await getTrackLyrics(input.track.trackId);
   const labels = labelsFor(input.miniGame);
+  const roundIndex = (input.session.currentRound?.index ?? 0) + 1;
+  // Per-match difficulty curve: ramps from the host's floor toward the finale.
+  const tier = tierForRound(roundIndex, input.session.rounds, input.session.difficultyFloor);
+  const diff = resolveDifficulty(tier);
+  const excludeKeys = new Set(input.session.usedPromptKeys);
   const base = {
-    index: (input.session.currentRound?.index ?? 0) + 1,
+    index: roundIndex,
     miniGame: input.miniGame,
     title: labels.title,
     instruction: labels.instruction,
@@ -313,10 +335,12 @@ async function buildSessionRound(input: {
     artistName: input.track.artistName,
     hasRichsync: input.track.hasRichsync,
     seed: input.seed,
+    difficulty: tier,
+    timeLimitMs: diff.timeLimitMs,
     copyright: lyrics.copyright,
     tracking: lyrics.tracking,
     startedAt: input.startedAt,
-    endsAt: input.startedAt + ROUND_TIME_LIMIT_MS,
+    endsAt: input.startedAt + diff.timeLimitMs,
     status: "answering" as const,
     answers: [],
   };
@@ -328,6 +352,9 @@ async function buildSessionRound(input: {
       lyrics: lyrics.body,
       copyright: lyrics.copyright,
       tracking: lyrics.tracking,
+      optionCount: diff.optionCount,
+      decoySimilarity: diff.decoySimilarity,
+      excludeKeys,
     });
     return {
       ...base,
@@ -400,6 +427,7 @@ async function buildSessionRound(input: {
       lyrics: lyrics.body,
       copyright: lyrics.copyright,
       tracking: lyrics.tracking,
+      excludeKeys,
     });
     return {
       ...base,
@@ -435,6 +463,9 @@ async function buildSessionRound(input: {
     lyrics: lyrics.body,
     copyright: lyrics.copyright,
     tracking: lyrics.tracking,
+    optionCount: diff.optionCount,
+    decoySimilarity: diff.decoySimilarity,
+    excludeKeys,
   });
 
   const prompt = generated.round.prompt;
@@ -489,7 +520,10 @@ export async function startRound(sessionCode: string, input: StartRoundInput): P
   const startedAt = now();
   const hasRichsync = track.hasRichsync === true;
   const miniGame = nextMiniGame(session, input.auto ? undefined : input.miniGame, hasRichsync);
-  const seed = Math.max(0, session.currentRound?.index ?? 0);
+  // Fold per-session entropy + round index + track into the content seed so the
+  // same track at the same round number differs show-to-show (was: raw index).
+  const baseIndex = Math.max(0, session.currentRound?.index ?? 0);
+  const seed = mix(session.contentSeed, baseIndex, track.trackId);
   let round: SessionRound;
   try {
     round = await buildSessionRound({ session, track, miniGame, seed, startedAt });
@@ -511,6 +545,9 @@ export async function startRound(sessionCode: string, input: StartRoundInput): P
   session.status = "playing";
   session.currentRound = round;
   session.playedGames.push(round.miniGame);
+  // Remember this round's source line so the next rounds rotate to fresh lyrics.
+  const usedKey = promptKeyFor(round);
+  if (usedKey) session.usedPromptKeys = [usedKey, ...session.usedPromptKeys].slice(0, 24);
   session.updatedAt = startedAt;
   return publicState(session);
 }
@@ -540,7 +577,8 @@ export async function submitAnswer(sessionCode: string, input: SubmitAnswerInput
   }
 
   const submittedAt = now();
-  const elapsedMs = Math.min(Math.max(0, submittedAt - round.startedAt), ROUND_TIME_LIMIT_MS);
+  const limitMs = round.timeLimitMs || ROUND_TIME_LIMIT_MS;
+  const elapsedMs = Math.min(Math.max(0, submittedAt - round.startedAt), limitMs);
   const solution = round.solution ?? "";
   const correct = normalizeAnswer(guess) === normalizeAnswer(solution);
   const points =
@@ -550,8 +588,9 @@ export async function submitAnswer(sessionCode: string, input: SubmitAnswerInput
           elapsedMs,
           streak: correct ? 1 : 0,
           dropProximityMs: onBeatProximityMs(round.drop, elapsedMs),
+          timeLimitMs: limitMs,
         }).total
-      : scoreFinishLine(correct, elapsedMs);
+      : scoreFinishLine(correct, elapsedMs, limitMs);
   const answer: SessionAnswer = {
     playerId: player.id,
     playerName: player.name,

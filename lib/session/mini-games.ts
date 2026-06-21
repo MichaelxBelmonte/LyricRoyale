@@ -33,16 +33,17 @@ export const MINI_GAME_CATEGORIES: MiniGameCategory[] = ["lyrics", "trivia", "ti
 
 // Canonical catalog: single source of truth for rotation order AND the host
 // picker labels. Order here is the order the autopilot cycles through.
+// Phase 0 roster: the three lyrics games that run reliably on ANY track (no
+// richsync, no >=4-track deck) and cover three distinct skills — recall, fake-
+// spotting, sequence. The other six were cut (richsync-fragile / deck-dependent /
+// overlapping / weak); their PNGs in public/games/ are reserved for the upcoming
+// generation-based audio games (Genre Roulette -> the_drop.png, Beat Lock ->
+// on_beat.png, Stem Heist -> song_mash.png). MiniGameId keeps the old values so
+// MiniGameArt + the builders stay valid; they simply never enter rotation now.
 export const MINI_GAME_CATALOG: MiniGameMeta[] = [
   { id: "finish_line", name: "Finish the Line", blurb: "Tap the missing last word.", example: "“…and I will always love ___”", category: "lyrics", image: "/games/finish_line.png" },
   { id: "mondegreen", name: "Misheard", blurb: "Spot the real lyric among the mondegreens.", example: "“Hold me closer, Tony Danza” — real or misheard?", category: "lyrics", image: "/games/mondegreen.png" },
-  { id: "the_drop", name: "The Drop", blurb: "Hit the word as the lyric lands.", example: "tap ▶ right on the drop", category: "timing", image: "/games/the_drop.png" },
-  { id: "on_beat", name: "On The Beat", blurb: "Lock the word right as the beat hits — timing scores.", example: "lock the word on the beat", category: "timing", image: "/games/on_beat.png" },
-  { id: "song_mash", name: "Who Said It", blurb: "Which track dropped this line?", example: "“…” → which song?", category: "trivia", image: "/games/song_mash.png" },
   { id: "next_line", name: "Next Line", blurb: "Pick the line that comes next.", example: "pick the line that comes next", category: "lyrics", image: "/games/next_line.png" },
-  { id: "name_song", name: "Name That Song", blurb: "Match the lyric to its track.", example: "match the lyric to its title", category: "trivia", image: "/games/name_song.png" },
-  { id: "artist_pick", name: "Artist Lock", blurb: "Pick the artist behind the lyric.", example: "“…” → whose lyric?", category: "trivia", image: "/games/artist_pick.png" },
-  { id: "word_rush", name: "Word Rush", blurb: "Pick the recurring keyword.", example: "spot the word that repeats most", category: "timing", image: "/games/word_rush.png" },
 ];
 
 // Façade-only entries shown in the host gallery as "Coming soon". They are NOT
