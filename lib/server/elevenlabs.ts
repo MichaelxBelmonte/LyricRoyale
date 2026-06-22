@@ -172,3 +172,67 @@ export async function composeMusic(input: MusicInput): Promise<Response> {
 
   return response;
 }
+
+// ---- Speech-to-Text (Scribe) -----------------------------------------------
+// Transcribe a short uploaded recording. Used by Studio Session to turn what a
+// player says on their phone into text that becomes the song's lyrics.
+export async function transcribeVoice(audio: Blob, languageCode?: string): Promise<string> {
+  const form = new FormData();
+  form.append("file", audio, "recording.webm");
+  form.append("model_id", "scribe_v2");
+  // language_code is optional; passing the session's narrator language helps
+  // short/noisy clips. Scribe also auto-detects when omitted.
+  if (languageCode) form.append("language_code", languageCode);
+  // No explicit Content-Type — fetch sets the multipart boundary for FormData.
+  const response = await fetch(`${BASE}/speech-to-text`, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey() },
+    body: form,
+    cache: "no-store",
+  });
+  if (!response.ok) throw new ElevenLabsProviderError(`ElevenLabs STT HTTP ${response.status}`);
+  const data = (await response.json()) as { text?: string };
+  return (data.text ?? "").trim();
+}
+
+// ---- Music with custom lyrics (composition plan) ---------------------------
+// Generate a fully-mixed SUNG track from explicit lyrics. Verified live: the
+// composition_plan path ONLY works with model_id "music_v1" (music_v2 → 422),
+// and `music_length_ms` must NOT be sent (each section carries its own
+// duration_ms). Returns ONE mixed mp3 (vocals + backing), not separate stems.
+// The singing voice is the model's — ElevenLabs Music cannot use a cloned voice.
+export interface CompositionSection {
+  section_name: string;
+  positive_local_styles: string[];
+  negative_local_styles?: string[];
+  /** 3000–120000 ms. */
+  duration_ms: number;
+  /** Max 30 lines, max 200 characters per line. */
+  lines: string[];
+}
+
+export interface CompositionPlan {
+  positive_global_styles: string[];
+  negative_global_styles?: string[];
+  sections: CompositionSection[];
+}
+
+export async function composeMusicWithLyrics(plan: CompositionPlan): Promise<Response> {
+  const response = await fetch(`${BASE}/music?output_format=auto`, {
+    method: "POST",
+    headers: {
+      "xi-api-key": apiKey(),
+      "Content-Type": "application/json",
+      Accept: "audio/mpeg",
+    },
+    // model_id MUST be music_v1 for composition_plan; do NOT add music_length_ms.
+    body: JSON.stringify({ model_id: "music_v1", composition_plan: plan }),
+    cache: "no-store",
+  });
+
+  if (!response.ok || !response.body) {
+    throw new ElevenLabsProviderError(`ElevenLabs Music(v1) HTTP ${response.status}`);
+  }
+
+  return response;
+}

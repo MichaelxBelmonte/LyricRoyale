@@ -58,6 +58,34 @@ export interface VoiceTrack {
   creatorName?: string;
 }
 
+// Studio Session: one player's recorded line turned into an AI-sung track. The
+// raw recording is consumed by the pipeline (STT) and never persisted; only the
+// generated mp3 lives in the in-process audio cache, served via /studio. `state`
+// drives the TV "loading bay" while the track is still cooking. Scored as a
+// "judge" round (crowd rating); solo play falls back to an AI-host verdict.
+export type StudioTrackState =
+  | "transcribing"
+  | "writing"
+  | "composing"
+  | "ready"
+  | "failed";
+
+export interface StudioTrack {
+  id: number;
+  playerId: string;
+  playerName: string;
+  state: StudioTrackState;
+  /** Speech-to-text of what the player said (ElevenLabs Scribe). */
+  transcript?: string;
+  /** Polished bars the AI sings (Claude); falls back to the raw transcript. */
+  lyric?: string;
+  /** URL of the generated, fully-mixed sung mp3 (ElevenLabs Music v1). */
+  audioUrl?: string;
+  /** Crowd-average rating, set at reveal. */
+  studioScore?: number;
+  error?: string;
+}
+
 // The host's instant voice clone for this session (ElevenLabs IVC). Deleted at
 // match end / teardown for privacy. `requiresVerification` mirrors ElevenLabs'
 // voice-captcha flag; the clone is still usable for TTS while it clears.

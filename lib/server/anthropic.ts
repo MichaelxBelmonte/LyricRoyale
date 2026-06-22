@@ -208,6 +208,87 @@ export async function writeBars(input: BarsInput): Promise<string> {
   }
 }
 
+// Studio Session: turn a player's spoken clip (already transcribed) into short,
+// clean, rhyming bars the AI will sing. Lower-latency model by default (one call
+// per player track, off the live round). The refusal guard + "rewrite clean if
+// inappropriate" instruction double as the content-safety gate before the text
+// becomes a broadcast song.
+function polishModel(): string {
+  return process.env.ANTHROPIC_POLISH_MODEL?.trim() || "claude-sonnet-4-6";
+}
+
+export interface PolishInput {
+  /** Speech-to-text of what the player said. */
+  transcript: string;
+  playerName: string;
+  /** Beat vibe (e.g. "trap", "boombap") to steer the flow. */
+  vibe?: string;
+  /** Native language name for the bars (defaults to English). */
+  nativeName?: string;
+}
+
+// Without Claude (or on refusal/timeout) we still need singable lyrics: reuse the
+// player's own words when present, else a clean hype line. Never echo unmoderated
+// text that tripped a refusal — that path returns the hype line instead.
+function fallbackPolish(input: PolishInput, allowTranscript = true): string {
+  const base = input.transcript.trim().slice(0, 200);
+  if (allowTranscript && base) return base;
+  return `Yo, ${input.playerName} on the mic — turn it up tonight!`;
+}
+
+export async function polishBars(input: PolishInput): Promise<string> {
+  const key = apiKey();
+  if (!key) return fallbackPolish(input);
+  const lang = input.nativeName?.trim() || "English";
+  const transcript = input.transcript.trim();
+  const prompt = [
+    `A party-game player recorded a short spoken clip. Turn it into 2 to 4 catchy rap/sung bars in ${lang} that an AI will SING over a ${input.vibe || "hip-hop"} beat.`,
+    `What they said: "${transcript || "(unclear / empty)"}"`,
+    "Keep their meaning and key words where you can; make it rhyme and flow.",
+    `Make it playful, hype, and CLEAN (no slurs/profanity/hate/sexual content). If the input is empty, unclear, or inappropriate, instead write a fun clean hype bar about ${input.playerName}.`,
+    "Return ONLY the bars as plain text separated by newlines — max 4 lines, each under 200 characters. No title, no quotes, no commentary.",
+  ].join("\n");
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const response = await fetch(`${BASE}/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: polishModel(),
+        max_tokens: 300,
+        messages: [{ role: "user", content: prompt }],
+      }),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      console.error("[anthropic.polish]", { status: response.status });
+      return fallbackPolish(input);
+    }
+    const data = (await response.json()) as {
+      stop_reason?: string;
+      content?: { type: string; text?: string }[];
+    };
+    // Refusal = the text was unsafe → never fall back to the raw transcript.
+    if (data.stop_reason === "refusal") return fallbackPolish(input, false);
+    const text = data.content?.find((block) => block.type === "text")?.text?.trim();
+    return text && text.length > 0 ? text.slice(0, 600) : fallbackPolish(input);
+  } catch (err) {
+    if (!(err instanceof Error && err.name === "AbortError")) {
+      console.error("[anthropic.polish]", { message: err instanceof Error ? err.message : "unknown" });
+    }
+    return fallbackPolish(input);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Logical lyric distractors. The local heuristics pick near-miss WORDS that are
 // unrelated to the sentence, so the right answer is obvious. Claude instead writes
 // wrong options that actually FIT the line (grammar, meaning, rhyme) and are
