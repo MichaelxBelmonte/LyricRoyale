@@ -114,7 +114,8 @@ export async function generateStudioTrack(input: StudioTrackInput): Promise<Stud
   const mp3 = new Uint8Array(await res.arrayBuffer());
   audioCache.set(cacheKey(input.code, input.trackId), mp3);
 
-  input.onState?.("ready");
+  // The caller owns the "ready" transition so it can set state + audioUrl + lyric
+  // atomically — emitting "ready" here would briefly show ready with no audioUrl.
   return {
     transcript,
     lyric,

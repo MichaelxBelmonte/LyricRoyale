@@ -190,6 +190,10 @@ export interface PartySession {
   // game is only playable once a clone exists and >=1 track is baked.
   voiceClone: VoiceClone | null;
   voiceTracks: VoiceTrack[];
+  // Studio Session: per-round player recordings turned into AI-sung tracks. The
+  // generated mp3s live in the in-process audio cache; this holds only metadata.
+  // Ephemeral — cleared on rematch / teardown.
+  studioTracks: StudioTrack[];
   autopilot: boolean;
   trackPool: SessionTrackRef[];
   players: SessionPlayer[];

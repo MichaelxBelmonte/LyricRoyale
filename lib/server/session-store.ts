@@ -42,6 +42,7 @@ import type {
   SessionRound,
   SessionTrackRef,
   StartRoundInput,
+  StudioTrack,
   SubmitAnswerInput,
 } from "@/lib/session/types";
 
@@ -165,6 +166,7 @@ export function createSession(input: CreateSessionInput = {}): PublicSessionStat
     trackStems: {},
     voiceClone: null,
     voiceTracks: [],
+    studioTracks: [],
     autopilot: input.autopilot ?? true,
     trackPool: [],
     players: [],
@@ -978,6 +980,53 @@ export function clearVoiceStudio(sessionCode: string): { session: PublicSessionS
   return { session: publicState(session), voiceId };
 }
 
+// ---- Studio Session mutations ----------------------------------------------
+
+// Next track id for a player recording (stable, monotonic across the session).
+export function nextStudioTrackId(sessionCode: string): number {
+  const session = assertSession(sessionCode);
+  return (session.studioTracks.at(-1)?.id ?? 0) + 1;
+}
+
+// Register a fresh player recording (state "transcribing"). One track per player:
+// a re-record replaces the player's previous track so the listening party never
+// shows duplicates for the same person.
+export function addStudioTrack(
+  sessionCode: string,
+  track: { id: number; playerId: string; playerName: string },
+): PublicSessionState {
+  const session = assertSession(sessionCode);
+  session.studioTracks = session.studioTracks.filter((t) => t.playerId !== track.playerId);
+  session.studioTracks.push({
+    id: track.id,
+    playerId: track.playerId,
+    playerName: track.playerName,
+    state: "transcribing",
+  });
+  session.updatedAt = now();
+  return publicState(session);
+}
+
+// Patch a studio track as the background pipeline progresses. Tolerant (no throw):
+// it runs fire-and-forget and may resolve after the session changed or vanished.
+export function updateStudioTrack(sessionCode: string, id: number, patch: Partial<StudioTrack>): void {
+  const session = sessions.get(cleanCode(sessionCode));
+  if (!session) return;
+  const track = session.studioTracks.find((t) => t.id === id);
+  if (!track) return;
+  Object.assign(track, patch);
+  session.updatedAt = now();
+}
+
+// Drop all studio tracks (rematch / teardown). Audio cache is cleared separately
+// via studio-session.clearStudioAudio by the caller (route).
+export function clearStudioSession(sessionCode: string): PublicSessionState {
+  const session = assertSession(sessionCode);
+  session.studioTracks = [];
+  session.updatedAt = now();
+  return publicState(session);
+}
+
 // Attach a host-prepared isolated stem to a deck track (Stem Lab → lalal.ai).
 // Once >=4 are attached, Stem Heist becomes selectable.
 export function setTrackStem(
@@ -1036,6 +1085,7 @@ export function restartMatch(sessionCode: string): PublicSessionState {
   session.currentRound = null;
   session.playedGames = [];
   session.usedPromptKeys = [];
+  session.studioTracks = [];
   session.rotation = shuffle(session.miniGames);
   session.status = "lobby";
   session.updatedAt = now();
