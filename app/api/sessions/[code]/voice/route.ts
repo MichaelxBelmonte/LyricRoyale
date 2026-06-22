@@ -116,6 +116,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     return fail("invalid_voice_action", 400);
   } catch (err) {
     const message = err instanceof Error ? err.message : "voice_failed";
+    // Surface the real cause in Railway/Server logs — the catch otherwise hides it
+    // inside the 502 body, so production 502s look opaque.
+    console.error(`[voice] session=${code} content-type=${contentType} failed:`, err);
     return fail(message, message === "session_not_found" ? 404 : 502);
   }
 }
