@@ -8,7 +8,9 @@ import Sticker from "@/components/brand/Sticker";
 import Avatar from "@/components/ui/Avatar";
 import CountdownRing from "@/components/session/CountdownRing";
 import PlayerResultCard from "@/components/session/PlayerResultCard";
+import StudioRecordPad from "@/components/session/StudioRecordPad";
 import { MusixmatchCredit } from "@/components/session/MusixmatchTracking";
+import { needsPlayerVoice } from "@/lib/session/mini-games";
 import { useCountUp } from "@/lib/client/useCountUp";
 import { copy } from "@/lib/i18n";
 import type { PublicSessionState, SessionAnswer } from "@/lib/session/types";
@@ -68,6 +70,11 @@ export default function PlayerRoom({ code }: { code: string }) {
   const answer = useMemo<SessionAnswer | null>(
     () => session?.currentRound?.answers.find((item) => item.playerId === playerId) ?? null,
     [playerId, session?.currentRound?.answers],
+  );
+  // The player's own Studio Session track (booth recording → AI track).
+  const myStudioTrack = useMemo(
+    () => session?.studioTracks?.find((t) => t.playerId === playerId) ?? null,
+    [playerId, session?.studioTracks],
   );
 
   // Live placement from the pre-sorted players list (no extra work server-side).
@@ -197,7 +204,20 @@ export default function PlayerRoom({ code }: { code: string }) {
           </div>
         ) : null}
 
-        {!session || session.status === "lobby" ? (
+        {session?.status === "lobby" && needsPlayerVoice(session.miniGames) ? (
+          <JCard spine="STUDIO · SIDE B" contentClassName="p-6">
+            <StudioRecordPad
+              code={code}
+              playerId={playerId}
+              playerName={me?.name ?? "Player"}
+              track={myStudioTrack}
+              onSession={setSession}
+            />
+            <p className="mt-4 border-t border-black/10 pt-3 text-center text-xs text-black/45">
+              The host starts the show once tracks are in.
+            </p>
+          </JCard>
+        ) : !session || session.status === "lobby" ? (
           <Waiting title="Waiting for host" body="Keep this controller open. The next round drops in here." />
         ) : null}
 
