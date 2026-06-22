@@ -26,7 +26,7 @@ import { getRichsyncLines, getTrackLyrics } from "@/lib/server/musixmatch";
 import { DEFAULT_BANTER_PACK, staticBanterPack, type BanterPack } from "@/lib/game/host-banter";
 import { normalizeLanguage } from "@/lib/game/languages";
 import { avatarForIndex, isPlayerAvatar } from "@/lib/session/avatars";
-import { ALL_MINI_GAME_IDS, gameBlockers, orderMiniGames } from "@/lib/session/mini-games";
+import { gameBlockers, orderMiniGames } from "@/lib/session/mini-games";
 import { generateLyricChoices, type LyricGame } from "@/lib/server/anthropic";
 import { gameCopy } from "@/lib/game/game-copy";
 import type { FinishLineDrop, Locale, TrackSummary } from "@/lib/types";
@@ -51,7 +51,11 @@ const DEFAULT_VOICE: HostVoiceConfig = {
   label: "Hype Host",
 };
 
-const DEFAULT_MINI_GAMES: MiniGameId[] = ALL_MINI_GAME_IDS;
+// Default selection when a room is created: just the three core lyrics games
+// (the first three in the catalog). They need only a Musixmatch deck — no API
+// keys, no host uploads — so the landing setup is the easiest possible. The host
+// can still add any of the other games in the picker.
+const DEFAULT_MINI_GAMES: MiniGameId[] = ["finish_line", "mondegreen", "next_line"];
 
 // Host-selectable match lengths. Anything else normalizes to the default.
 const ALLOWED_ROUNDS = [3, 6, 9];

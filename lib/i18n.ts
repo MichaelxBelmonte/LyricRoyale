@@ -135,6 +135,8 @@ export const copy = {
     readyLabel: "Ready",
     outOfLabel: "of",
     lockedSuffix: "locked",
+    questionLabel: "Question",
+    sourceLabel: "From",
     bragText: "I finished {place} of {total} in Soundclash — {score} pts. Join room {code}!",
   },
   it: {
@@ -268,6 +270,8 @@ export const copy = {
     readyLabel: "Pronto",
     outOfLabel: "su",
     lockedSuffix: "bloccati",
+    questionLabel: "Domanda",
+    sourceLabel: "Da",
     bragText: "Sono arrivato {place} su {total} in Soundclash — {score} pt. Entra nella stanza {code}!",
   },
 } satisfies Record<Locale, Record<string, string>>;
