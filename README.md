@@ -64,9 +64,15 @@ ready — there are **no silent swaps**:
 | Beat Lock | Timing | Tap on the beat — timing scores | ElevenLabs Music |
 | Stem Heist | Trivia | Name the track from one isolated stem | LALAL.AI stems (host upload) |
 | Voice Clash | Trivia | The host's cloned voice drops a track — rate it | ElevenLabs voice clone |
+| **Studio Session** ★ | Trivia | Each player records a line → the AI sings it → the crowd rates every track | ElevenLabs STT + Music |
+
+★ **Studio Session** is the featured "dev pick" in the host picker and the headline of the
+one-tap Quick Set (Finish the Line + Studio Session + Genre Roulette).
 
 The three lyrics games run on **any** Musixmatch track; their tempting wrong answers are written
 live by Claude when `ANTHROPIC_API_KEY` is set, falling back to local heuristics otherwise.
+Tapping **Auto-pick** defaults to the three core lyrics games; the host can add any of the
+audio/voice games above (each gated on its content source — keys, stems, or recordings).
 
 A "coming soon" gallery (Karaoke Clash, Rap Battle) is shown in the host picker for the pitch
 but never enters rotation.
@@ -88,7 +94,7 @@ but never enters rotation.
 | App | Next.js App Router, React, TypeScript |
 | Styling | Tailwind + Soundclash brand utilities |
 | Lyrics | Musixmatch server-side proxy |
-| Voice + soundtrack | ElevenLabs server-side proxy + generated static MP3 assets |
+| Voice, music & STT | ElevenLabs server-side proxy (TTS, Music, voice clone, Scribe STT) + generated static MP3 assets |
 | Stem separation | LALAL.AI server-side proxy |
 | Future persistence | Supabase Postgres + Realtime |
 
@@ -97,7 +103,7 @@ but never enters rotation.
 | Provider | Use | Status |
 |---|---|---|
 | Musixmatch | Search, lyrics, richsync, track metadata | Verified |
-| ElevenLabs | AI host text-to-speech | Verified |
+| ElevenLabs | Host TTS · Music (Genre Roulette / Beat Lock) · voice clone (Voice Clash) · STT (Studio Session) | Verified |
 | LALAL.AI | Stem separation lab | Wired |
 | Supabase | Persistence/realtime target | Planned for room hardening |
 | Anthropic Claude | Lyric-game distractors, Voice Clash bars, host-banter localization | Wired |

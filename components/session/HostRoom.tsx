@@ -61,8 +61,12 @@ const SETUP_STEPS = [
 ];
 type SetupStep = (typeof SETUP_STEPS)[number]["id"];
 
-// A balanced one-tap starter: one game per category (all from the live catalog).
-const QUICK_SET: MiniGameId[] = ["finish_line", "genre_roulette", "beat_lock"];
+// A curated one-tap starter trio, built around the dev-favourite Studio Session.
+const QUICK_SET: MiniGameId[] = ["finish_line", "studio_session", "genre_roulette"];
+
+// The "dev pick" — gets a distinctive gold frame + sticker in the picker so it
+// stands out as the recommended / most-fun game.
+const FEATURED_GAME: MiniGameId = "studio_session";
 
 // Games whose ANSWER is the source track / artist — showing the track header while
 // players are still answering would hand them the solution. We hide the source on
@@ -693,7 +697,7 @@ export default function HostRoom({ code }: { code: string }) {
                   colour rhythm — keeps the picker to a single shallow row. Scrollbar is
                   hidden; the peeking cards + right-edge fade are the scroll affordance. */}
               <div className="relative mt-3 -mx-4 sm:-mx-6 lg:mx-0">
-                <div data-games-row className="no-scrollbar flex snap-x gap-2.5 overflow-x-auto px-4 pb-1 sm:px-6 lg:px-0">
+                <div data-games-row className="no-scrollbar flex snap-x gap-2.5 overflow-x-auto px-4 py-2 sm:px-6 lg:px-0">
                   {MINI_GAME_CATEGORIES.flatMap((category) =>
                     MINI_GAME_CATALOG.filter((game) => game.category === category),
                   ).map((game) => {
@@ -702,6 +706,7 @@ export default function HostRoom({ code }: { code: string }) {
                     const selected = session.miniGames.includes(game.id);
                     const isLast = selected && session.miniGames.length === 1;
                     const prepLabel = PREP_BANNER[contentSourceFor(game.id)];
+                    const featured = game.id === FEATURED_GAME;
                     return (
                       <button
                         key={game.id}
@@ -719,6 +724,8 @@ export default function HostRoom({ code }: { code: string }) {
                         className={[
                           "group relative flex w-32 shrink-0 snap-start flex-col overflow-hidden rounded-xl border text-left transition-all disabled:cursor-not-allowed sm:w-36",
                           selected ? tone.selected : "border-black/10 hover:border-black/15",
+                          // Dev-pick gets a standout gold glow frame.
+                          featured ? "shadow-[0_0_0_2px_rgba(255,212,0,0.7),0_12px_30px_-8px_rgba(255,212,0,0.5)]" : "",
                         ].join(" ")}
                       >
                         <div
@@ -777,6 +784,12 @@ export default function HostRoom({ code }: { code: string }) {
                               ].join(" ")}
                             >
                               <Icon name="check" size={12} />
+                            </span>
+                          ) : null}
+                          {/* Dev-pick die-cut sticker — marks the featured game. */}
+                          {featured ? (
+                            <span className="absolute bottom-2 right-2 z-20 inline-flex items-center gap-1 rounded-full border-2 border-white bg-yellow px-1.5 py-0.5 font-mono text-[0.5rem] font-bold uppercase leading-none tracking-[0.06em] text-ink shadow-[0_2px_0_rgba(0,0,0,0.3)]">
+                              ★ Dev pick
                             </span>
                           ) : null}
                         </div>
