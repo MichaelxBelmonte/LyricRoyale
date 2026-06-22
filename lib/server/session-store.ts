@@ -247,6 +247,22 @@ const GENERATED_AUDIO_GAMES = new Set<MiniGameId>(["genre_roulette", "beat_lock"
 // needs a longer listen. Genre Roulette needs ~20s — you can't name a vibe in 8s.
 const MIN_TIME_BY_GAME: Partial<Record<MiniGameId, number>> = { genre_roulette: 20_000 };
 
+// "Get ready" lead-in (ms): every round opens with a short 3-2-1 before the
+// answer clock starts, so players aren't already losing time while the host
+// announces the round and they read the prompt. The answer window (startedAt →
+// endsAt) is pushed this far into the future; clients show the countdown until
+// startedAt and only then enable answering. Scoring measures elapsed from
+// startedAt, so the lead-in is never counted against the player.
+const ROUND_LEAD_IN_MS = 3_000;
+
+// Multiple-choice rounds get at least this long to answer. The difficulty ramp
+// tops out at 18s (tier 1) and shrinks to 8s on the hardest tier, which feels
+// rushed when you still have to read every option — so we floor every choice
+// round at 20s. Since the floor sits above the whole ramp, in practice all
+// choice rounds land here. Also widens the speed-score denominator, so the speed
+// bonus stays proportional to this longer window.
+const CHOICE_MIN_TIME_MS = 20_000;
+
 // A game is playable on a given track only if its data requirement is met:
 // audio games need music generation; the_drop / on_beat need richsync timing.
 function isPlayable(game: MiniGameId, hasRichsync: boolean): boolean {
@@ -855,7 +871,11 @@ export async function startRound(sessionCode: string, input: StartRoundInput): P
   });
   if (blockers.length > 0) throw new Error(`games_not_ready:${blockers.map((b) => b.game).join(",")}`);
 
-  const startedAt = now();
+  const createdAt = now();
+  // Answering opens after the "get ready" lead-in; every builder derives
+  // startedAt/endsAt from this, so the whole round (and its auto-reveal timer,
+  // which keys off endsAt) shifts forward together.
+  const startedAt = createdAt + ROUND_LEAD_IN_MS;
   const hasRichsync = track.hasRichsync === true;
   const miniGame = nextMiniGame(session, input.auto ? undefined : input.miniGame, hasRichsync);
   // Fold per-session entropy + round index + track into the content seed so the
@@ -880,6 +900,15 @@ export async function startRound(sessionCode: string, input: StartRoundInput): P
     }
   }
 
+  // Floor the answering window for multiple-choice rounds so reading every
+  // option never gets squeezed below CHOICE_MIN_TIME_MS, even on the hardest
+  // difficulty tiers. endsAt and the speed-score denominator both read
+  // timeLimitMs, so adjusting it here keeps the timer and scoring consistent.
+  if (round.answerType === "choice" && round.timeLimitMs < CHOICE_MIN_TIME_MS) {
+    round.timeLimitMs = CHOICE_MIN_TIME_MS;
+    round.endsAt = round.startedAt + round.timeLimitMs;
+  }
+
   session.status = "playing";
   session.currentRound = round;
   // Warm the bespoke victory sigla now (no-op if already cached / not configured)
@@ -889,7 +918,8 @@ export async function startRound(sessionCode: string, input: StartRoundInput): P
   // Remember this round's source line so the next rounds rotate to fresh lyrics.
   const usedKey = promptKeyFor(round);
   if (usedKey) session.usedPromptKeys = [usedKey, ...session.usedPromptKeys].slice(0, 24);
-  session.updatedAt = startedAt;
+  // Real wall-clock for the metadata stamp — startedAt is now in the future.
+  session.updatedAt = createdAt;
   return publicState(session);
 }
 
@@ -924,6 +954,13 @@ export async function submitAnswer(sessionCode: string, input: SubmitAnswerInput
   }
 
   const submittedAt = now();
+  // The answer window hasn't opened yet (still in the "get ready" lead-in). The
+  // client holds answering back, but this is the authoritative gate: it stops a
+  // skewed/automated client from banking elapsedMs=0 (max speed bonus, since
+  // submittedAt < startedAt) and from prematurely satisfying the host's
+  // all-answered auto-reveal. startedAt and submittedAt share the server clock,
+  // so this never rejects an honest answer placed after the window opens.
+  if (submittedAt < round.startedAt) throw new Error("round_not_active");
   const limitMs = round.timeLimitMs || ROUND_TIME_LIMIT_MS;
   const elapsedMs = Math.min(Math.max(0, submittedAt - round.startedAt), limitMs);
   // Beat Lock submits a 0..100 timing-accuracy score (computed on the phone)

@@ -26,6 +26,7 @@ import {
 } from "@/lib/game/host-banter";
 import { languageName } from "@/lib/game/languages";
 import { copy } from "@/lib/i18n";
+import { useLeadIn } from "@/lib/client/useLeadIn";
 import {
   ALL_MINI_GAME_IDS,
   CATEGORY_META,
@@ -1131,8 +1132,11 @@ function HostRound({
   const remainingRatio = Math.max(0, Math.min(1, remainingMs / durationMs));
   const t = copy[session.locale];
   const answering = active?.status === "answering";
-  const urgent = Boolean(answering && remainingMs <= 5000);
-  const critical = Boolean(answering && remainingMs <= 3000);
+  // Pre-round "get ready" 3-2-1 — the answer clock hasn't started yet.
+  const lead = useLeadIn(active?.startedAt ?? 0);
+  const inLeadIn = Boolean(answering && lead.active);
+  const urgent = Boolean(answering && !inLeadIn && remainingMs <= 5000);
+  const critical = Boolean(answering && !inLeadIn && remainingMs <= 3000);
   const answered = active?.answers.length ?? 0;
   const totalPlayers = session.players.length;
   // Hide the source track/artist while showing it would spoil the answer (the song
@@ -1178,7 +1182,11 @@ function HostRound({
               style={{ width: `${remainingRatio * 100}%` }}
             />
           </div>
-          {answering ? (
+          {inLeadIn ? (
+            <p className="origin-right text-right tabular-nums transition-transform led animate-blank-pulse text-xl">
+              {t.getReadyLabel} {lead.seconds}
+            </p>
+          ) : answering ? (
             <p
               className={[
                 "origin-right text-right tabular-nums transition-transform",
@@ -1194,7 +1202,7 @@ function HostRound({
           ) : (
             <p className="text-right font-mono text-xs tabular-nums text-black/45">reveal</p>
           )}
-          {answering && totalPlayers > 0 ? (
+          {answering && !inLeadIn && totalPlayers > 0 ? (
             <LockMeter answered={answered} total={totalPlayers} label={t.lockedSuffix} />
           ) : null}
         </div>
@@ -1356,7 +1364,10 @@ function LockMeter({ answered, total, label }: { answered: number; total: number
 function AudioRoundStage({ round }: { round: NonNullable<PublicSessionState["currentRound"]> }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [blocked, setBlocked] = useState(false);
-  const playing = round.status === "answering";
+  // Hold playback until the "get ready" lead-in is over, so the bed starts when
+  // the answer window opens (and the phone's tap pad mounts), not 3s earlier.
+  const lead = useLeadIn(round.startedAt);
+  const playing = round.status === "answering" && !lead.active;
 
   // Browsers block autoplay outside a user-gesture window. Try to play; if it's
   // rejected, surface a tap-to-play button instead of failing silently.
@@ -1420,7 +1431,9 @@ function VoiceClashStage({ round }: { round: NonNullable<PublicSessionState["cur
   const beatRef = useRef<HTMLAudioElement | null>(null);
   const vocalRef = useRef<HTMLAudioElement | null>(null);
   const [blocked, setBlocked] = useState(false);
-  const playing = round.status === "answering";
+  // Hold playback until the lead-in is over (start at the answer window, not 3s early).
+  const lead = useLeadIn(round.startedAt);
+  const playing = round.status === "answering" && !lead.active;
 
   // Start the layered beat + vocal together; if autoplay is blocked, show a tap.
   const tryPlay = useCallback(() => {
@@ -1506,7 +1519,10 @@ function StudioSessionStage({ round }: { round: NonNullable<PublicSessionState["
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [idx, setIdx] = useState(0);
   const [blocked, setBlocked] = useState(false);
-  const answering = round.status === "answering";
+  // Hold the carousel until the lead-in is over, so track 1 starts when the crowd
+  // can actually rate it (the phone shows the rating pad), not during "get ready".
+  const lead = useLeadIn(round.startedAt);
+  const answering = round.status === "answering" && !lead.active;
   const current = tracks.length ? tracks[Math.min(idx, tracks.length - 1)] : null;
 
   const tryPlay = useCallback(() => {
@@ -1610,12 +1626,20 @@ function StudioSessionStage({ round }: { round: NonNullable<PublicSessionState["
 function HostPrompt({ round }: { round: NonNullable<PublicSessionState["currentRound"]> }) {
   const hasBlank = round.prompt.includes("_____");
   const [before, after = ""] = round.prompt.split("_____");
+  // Only animate the karaoke cue once the answer window is open, anchored to the
+  // same startedAt the server scores against — so the visible "drop is here"
+  // moment lines up with the drop-bonus clock.
+  const lead = useLeadIn(round.startedAt);
 
   if (!hasBlank) return round.prompt;
 
   return (
     <>
-      {round.drop && round.status === "answering" ? <KaraokeTokens drop={round.drop} /> : before}
+      {round.drop && round.status === "answering" && !lead.active ? (
+        <KaraokeTokens drop={round.drop} startedAt={round.startedAt} />
+      ) : (
+        before
+      )}
       <span className="mx-2 inline-flex min-w-[5rem] justify-center rounded border-b-4 border-brand px-3 font-mono text-brand">
         {round.status === "revealed" && round.solution ? round.solution : "_____"}
       </span>
@@ -1646,17 +1670,20 @@ function dropCycle(drop: FinishLineDrop): number {
   return Math.max(drop.lineDuration, drop.dropOffset + 0.6, lastOffset + 0.6);
 }
 
-function KaraokeTokens({ drop }: { drop: FinishLineDrop }) {
+function KaraokeTokens({ drop, startedAt }: { drop: FinishLineDrop; startedAt: number }) {
   const [elapsed, setElapsed] = useState(0);
 
+  // Anchor to the round's actual answer-window start (startedAt), NOT to mount
+  // time. This keeps the highlight aligned with the server's drop-bonus clock and
+  // makes the animation stable across the ~1s session poll (which re-runs this
+  // effect with a fresh `drop` reference but the same startedAt).
   useEffect(() => {
-    const startedAt = Date.now();
     const cycle = dropCycle(drop);
-    const timer = window.setInterval(() => {
-      setElapsed(((Date.now() - startedAt) / 1000) % cycle);
-    }, 80);
+    const tick = () => setElapsed((Math.max(0, Date.now() - startedAt) / 1000) % cycle);
+    tick();
+    const timer = window.setInterval(tick, 80);
     return () => window.clearInterval(timer);
-  }, [drop]);
+  }, [drop, startedAt]);
 
   let activeIndex = -1;
   for (let i = 0; i < drop.tokens.length; i++) {

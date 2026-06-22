@@ -12,6 +12,7 @@ import StudioRecordPad from "@/components/session/StudioRecordPad";
 import { MusixmatchCredit } from "@/components/session/MusixmatchTracking";
 import { needsPlayerVoice } from "@/lib/session/mini-games";
 import { useCountUp } from "@/lib/client/useCountUp";
+import { useLeadIn } from "@/lib/client/useLeadIn";
 import { copy } from "@/lib/i18n";
 import type { PublicSessionState, SessionAnswer } from "@/lib/session/types";
 
@@ -92,6 +93,13 @@ export default function PlayerRoom({ code }: { code: string }) {
     return map;
   }, [playerId, session?.currentRound]);
 
+  // Pre-round "get ready" countdown — true while the answer window hasn't opened
+  // yet, so we hold answering back and show a 3-2-1 instead.
+  const lead = useLeadIn(session?.currentRound?.startedAt ?? 0);
+  const inLeadIn = Boolean(
+    session?.currentRound?.status === "answering" && !answer && lead.active,
+  );
+
   // Live placement from the pre-sorted players list (no extra work server-side).
   const myRank = useMemo(() => {
     if (!session || !playerId) return null;
@@ -115,6 +123,8 @@ export default function PlayerRoom({ code }: { code: string }) {
     // Studio Session lets a player rate many tracks, so don't block on a prior
     // answer; the server dedups per (player, track).
     const isStudio = session?.currentRound?.miniGame === "studio_session";
+    // The answer window hasn't opened yet (still in the "get ready" lead-in).
+    if (inLeadIn) return;
     if (!playerId || !cleanGuess || submitting || (answer && !isStudio)) return;
     setSubmitting(true);
     setError(null);
@@ -246,20 +256,28 @@ export default function PlayerRoom({ code }: { code: string }) {
                 {session.currentRound.title}
               </Sticker>
               {!answer && session.currentRound.status === "answering" ? (
-                <CountdownRing
-                  endsAt={session.currentRound.endsAt}
-                  startedAt={session.currentRound.startedAt}
-                />
+                inLeadIn ? (
+                  <LeadInBadge seconds={lead.seconds} label={copy[session.locale].getReadyLabel} />
+                ) : (
+                  <CountdownRing
+                    endsAt={session.currentRound.endsAt}
+                    startedAt={session.currentRound.startedAt}
+                  />
+                )
               ) : null}
             </div>
             <h1 className="mt-4 font-condensed text-3xl uppercase leading-tight tracking-tight text-[#15120E]">
               {session.currentRound.instruction}
             </h1>
             <p className="mt-2 text-sm text-black/55">
-              Watch the main screen. Lock once before the host reveals.
+              {inLeadIn
+                ? copy[session.locale].getReadyLabel
+                : "Watch the main screen. Lock once before the host reveals."}
             </p>
 
-            {session.currentRound.miniGame === "studio_session" ? (
+            {inLeadIn && session.currentRound.answerType !== "choice" ? (
+              <GetReadyPad seconds={lead.seconds} label={copy[session.locale].getReadyLabel} />
+            ) : session.currentRound.miniGame === "studio_session" ? (
               <StudioRatePad
                 round={session.currentRound}
                 playerId={playerId}
@@ -289,7 +307,7 @@ export default function PlayerRoom({ code }: { code: string }) {
                     key={option}
                     type="button"
                     onClick={() => void submitGuess(option)}
-                    disabled={submitting}
+                    disabled={submitting || inLeadIn}
                     className="flex min-h-14 w-full items-center gap-3 rounded-xl border-2 border-black/15 bg-white px-4 py-3 text-left text-base font-semibold text-[#15120E] transition-colors hover:border-[#C2563B] active:border-[#C2563B] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <span className="shrink-0 font-mono text-sm text-black/40">{index + 1}</span>
@@ -361,6 +379,31 @@ export default function PlayerRoom({ code }: { code: string }) {
         ) : null}
       </section>
     </main>
+  );
+}
+
+// Compact pre-round badge that sits where the CountdownRing normally goes,
+// counting 3-2-1 down to the answer window opening.
+function LeadInBadge({ seconds, label }: { seconds: number; label: string }) {
+  return (
+    <span
+      className="grid shrink-0 place-items-center rounded-full border-2 border-[#C2563B]/40 bg-[#C2563B]/10 text-center animate-blank-pulse"
+      style={{ width: 56, height: 56 }}
+      aria-label={`${label} ${seconds}`}
+    >
+      <span className="font-mono text-2xl font-bold tabular-nums text-brand leading-none">{seconds}</span>
+    </span>
+  );
+}
+
+// Full-width "get ready" panel shown in place of the answer pad during the
+// lead-in for rounds that don't show their options early (tap / judge / text).
+function GetReadyPad({ seconds, label }: { seconds: number; label: string }) {
+  return (
+    <div className="mt-6 grid place-items-center gap-2 rounded-2xl border-2 border-[#C2563B]/30 bg-[#C2563B]/[0.06] px-4 py-10 text-center">
+      <p className="font-mono text-xs uppercase tracking-[0.2em] text-brand">{label}</p>
+      <p className="led led-danger text-6xl font-bold tabular-nums animate-blank-pulse">{seconds}</p>
+    </div>
   );
 }
 
