@@ -91,6 +91,23 @@ const config: Config = {
           "0%": { backgroundPosition: "0% 50%" },
           "100%": { backgroundPosition: "200% 50%" },
         },
+        // Winners screen: cassette plinths rise from the floor (origin-bottom).
+        "podium-rise": {
+          "0%": { opacity: "0", transform: "translateY(18px) scaleY(0.7)" },
+          "100%": { opacity: "1", transform: "translateY(0) scaleY(1)" },
+        },
+        // Tape-burst strips settle into their seeded resting rotation (--tape-rot).
+        "tape-fall": {
+          "0%": { opacity: "0", transform: "translateY(-26px) rotate(0deg) scaleY(0.4)" },
+          "55%": { opacity: "1" },
+          "100%": { opacity: "1", transform: "translateY(0) rotate(var(--tape-rot, 0deg)) scaleY(1)" },
+        },
+        // Lock-in pop for live answer chips on the host screen.
+        "lock-pop": {
+          "0%": { opacity: "0.4", transform: "scale(0.6)" },
+          "60%": { opacity: "1", transform: "scale(1.15)" },
+          "100%": { transform: "scale(1)" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.4s cubic-bezier(0.2,0.7,0.2,1) both",
@@ -99,6 +116,9 @@ const config: Config = {
         "slam-in": "slam-in 0.32s cubic-bezier(0.2,0.8,0.2,1) both",
         "flash-out": "flash-out 0.4s ease-out both",
         shimmer: "shimmer 6s linear infinite",
+        "podium-rise": "podium-rise 0.5s cubic-bezier(0.2,0.8,0.2,1) both",
+        "tape-fall": "tape-fall 0.7s cubic-bezier(0.2,0.7,0.2,1) both",
+        "lock-pop": "lock-pop 0.32s cubic-bezier(0.2,0.8,0.2,1) both",
       },
     },
   },

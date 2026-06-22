@@ -1,4 +1,4 @@
-export type SoundtrackId = "signal" | "clash";
+export type SoundtrackId = "signal" | "clash" | "victory";
 
 export interface Soundtrack {
   id: SoundtrackId;
@@ -31,6 +31,15 @@ export const SOUNDTRACKS: Soundtrack[] = [
     title: "Clash Transmission",
     src: "/audio/soundclash-clash.mp3",
     vibe: "Round",
+  },
+  // The "sigla finale": the host screen swaps to this when the winners screen
+  // mounts. Source is a bespoke generated victory outro (ElevenLabs Music, cached)
+  // with a deterministic fallback to the bundled mixtape asset — see /api/music.
+  {
+    id: "victory",
+    title: "Victory Mixtape",
+    src: "/api/music?sigla=1",
+    vibe: "Win",
   },
 ];
 

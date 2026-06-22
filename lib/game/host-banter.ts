@@ -1,4 +1,4 @@
-import type { SessionRound } from "@/lib/session/types";
+import type { SessionPlayer, SessionRound } from "@/lib/session/types";
 
 // A localized set of host-narrator lines. Templates use {placeholder} tokens
 // filled in at runtime (player name, lyric, room code, …). The static IT/EN
@@ -18,6 +18,13 @@ export interface BanterPack {
   finalWith: string;
   /** Closing line with no ranked leader. */
   finalEmpty: string;
+  /**
+   * Winners-screen crown line — {leader} {score}. Optional so the 27 Claude-
+   * generated/cached packs degrade to finalWith until they regenerate with it.
+   */
+  crownWith?: string;
+  /** Winners-screen runner-up line — {second}. Optional (same reason). */
+  runnerUp?: string;
   /** Reveal: who leads — {leader}. */
   leaderLine: string;
   /** Reveal: no ranked leader yet. */
@@ -44,6 +51,8 @@ const EN_PACK: BanterPack = {
   welcomeEmpty: "Room {code}. Grab your phones.",
   finalWith: "{leader} wins!",
   finalEmpty: "That's a wrap!",
+  crownWith: "{leader} is the Soundclash champion — {score} points!",
+  runnerUp: "{second} takes second.",
   leaderLine: "{leader} leads.",
   scoresLocked: "Scores locked.",
   answerLine: "«{solution}».",
@@ -62,6 +71,8 @@ const IT_PACK: BanterPack = {
   welcomeEmpty: "Stanza {code}. Telefoni alla mano.",
   finalWith: "{leader} vince!",
   finalEmpty: "È finita!",
+  crownWith: "{leader} è il campione di Soundclash — {score} punti!",
+  runnerUp: "{second} arriva secondo.",
   leaderLine: "{leader} comanda.",
   scoresLocked: "Punteggi bloccati.",
   answerLine: "«{solution}».",
@@ -116,6 +127,24 @@ export function welcomeLine(code: string, players: number, pack: BanterPack): st
 
 export function finalLine(leader: string | undefined, pack: BanterPack): string {
   return leader ? fill(pack.finalWith, { leader }) : pack.finalEmpty;
+}
+
+/**
+ * Crown the winner on the winners screen: announces the champion by name + final
+ * score, then the runner-up. `players` must be the score-sorted list. Falls back to
+ * finalWith/finalEmpty when the pack predates the crown fields (so older cached
+ * packs never break). Interpolation stays in code — the LLM never sees live names.
+ */
+export function crownLine(players: Pick<SessionPlayer, "name" | "score">[], pack: BanterPack): string {
+  const leader = players[0];
+  if (!leader) return pack.finalEmpty;
+  const template = pack.crownWith ?? pack.finalWith;
+  let line = fill(template, { leader: leader.name, score: String(leader.score) });
+  const second = players[1];
+  if (second && pack.runnerUp) {
+    line = `${line} ${fill(pack.runnerUp, { second: second.name })}`;
+  }
+  return line.length > MAX_LEN ? `${line.slice(0, MAX_LEN - 1)}…` : line;
 }
 
 // Reveal helpers — these replace the inline IT/EN ternaries that used to live in

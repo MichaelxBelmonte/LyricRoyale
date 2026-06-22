@@ -9,6 +9,7 @@ import AudioConsole from "@/components/session/AudioConsole";
 import JoinQr from "@/components/session/JoinQr";
 import MiniGameArt from "@/components/session/MiniGameArt";
 import MusicPicker from "@/components/session/MusicPicker";
+import PodiumStage from "@/components/session/PodiumStage";
 import StemLab from "@/components/session/StemLab";
 import VoiceStudio from "@/components/session/VoiceStudio";
 import { MusixmatchTracking } from "@/components/session/MusixmatchTracking";
@@ -16,7 +17,7 @@ import Avatar from "@/components/ui/Avatar";
 import Icon from "@/components/ui/Icon";
 import {
   buildRoastLine,
-  finalLine,
+  crownLine,
   revealAnswerLine,
   revealLeaderLine,
   roundIntroLine,
@@ -24,6 +25,7 @@ import {
   welcomeLine,
 } from "@/lib/game/host-banter";
 import { languageName } from "@/lib/game/languages";
+import { copy } from "@/lib/i18n";
 import {
   ALL_MINI_GAME_IDS,
   CATEGORY_META,
@@ -40,6 +42,16 @@ import type { HostVoicePreset, MiniGameId, PublicSessionState } from "@/lib/sess
 import type { ErrorResponse, FinishLineDrop, TrackSummary } from "@/lib/types";
 
 const ROUND_OPTIONS = [3, 6, 9];
+
+// Swap the global room soundtrack (AudioDirector listens for this). `play: true`
+// forces the new track to start (used for the victory sigla); `play: false` just
+// swaps the track and respects whatever play/stop state the host had.
+function dispatchTrack(trackId: "signal" | "clash" | "victory", play: boolean) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent("soundclash:audio-control", { detail: { action: "track", trackId, play } }),
+  );
+}
 
 const SETUP_STEPS = [
   { id: "games" as const, label: "Mini-games" },
@@ -147,6 +159,8 @@ export default function HostRoom({ code }: { code: string }) {
     return () => {
       teardownSpeech();
       window.dispatchEvent(new CustomEvent("soundclash:duck", { detail: { active: false } }));
+      // Restore the normal loop so the victory sigla never follows us off the room.
+      dispatchTrack("signal", false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -219,7 +233,7 @@ export default function HostRoom({ code }: { code: string }) {
     }
   }
 
-  async function patchSession(actionName: "reveal" | "lobby") {
+  async function patchSession(actionName: "reveal" | "lobby" | "restart") {
     const response = await fetch(`/api/sessions/${code}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -229,10 +243,23 @@ export default function HostRoom({ code }: { code: string }) {
     if (payload.session) setSession(payload.session);
   }
 
-  // Leaving a live round back to the lobby must also silence the host.
+  // Leaving a live round / the winners screen back to the lobby must silence the
+  // host, drop the victory sigla, and clear the once-fired event guards so the next
+  // show speaks cleanly.
   function goToLobby() {
     stopSpeaking();
+    spokenEvents.current.clear();
+    dispatchTrack("signal", false);
     void patchSession("lobby");
+  }
+
+  // "Run it back": reset the scoreboard for a rematch (server keeps players + setlist),
+  // resume the normal soundtrack, and clear the speech guards.
+  function runItBack() {
+    stopSpeaking();
+    spokenEvents.current.clear();
+    dispatchTrack("signal", false);
+    void patchSession("restart");
   }
 
   async function configureGames(next: MiniGameId[]) {
@@ -309,7 +336,15 @@ export default function HostRoom({ code }: { code: string }) {
     const active = session?.currentRound;
     if (!active || session.status !== "results" || active.status !== "revealed") return;
     if (active.index >= session.rounds) {
-      void speakHost(finalLine(session.players[0]?.name, session.banter));
+      // Fire exactly once — the 1.2s poll keeps this effect's state alive, so an
+      // unguarded body would restart the sigla / re-crown on every tick.
+      const key = `endgame:${active.index}`;
+      if (!spokenEvents.current.has(key)) {
+        spokenEvents.current.add(key);
+        // Sigla finale: swap the room to the victory theme, then crown the winner.
+        dispatchTrack("victory", true);
+        speakHost(crownLine(session.players, session.banter), "hype");
+      }
       return;
     }
     const timer = window.setTimeout(() => void startNextAutoRound(), 5200);
@@ -533,7 +568,10 @@ export default function HostRoom({ code }: { code: string }) {
         />
       </div>
 
-      {session?.status === "playing" || session?.status === "results" ? (
+      {session?.complete ? (
+        // Game over → the cassette award-show takeover (full width, no round view).
+        <PodiumStage session={session} onRestart={runItBack} onLobby={goToLobby} />
+      ) : session?.status === "playing" || session?.status === "results" ? (
         <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr]">
           <aside>
             <section className="rounded-2xl border border-black/10 bg-paper-raised p-4">
@@ -1041,6 +1079,12 @@ function HostRound({
   const remainingMs = useRemainingMs(active?.endsAt ?? 0, active?.status === "answering");
   const durationMs = active ? Math.max(1, active.endsAt - active.startedAt) : 1;
   const remainingRatio = Math.max(0, Math.min(1, remainingMs / durationMs));
+  const t = copy[session.locale];
+  const answering = active?.status === "answering";
+  const urgent = Boolean(answering && remainingMs <= 5000);
+  const critical = Boolean(answering && remainingMs <= 3000);
+  const answered = active?.answers.length ?? 0;
+  const totalPlayers = session.players.length;
 
   return (
     <div>
@@ -1057,7 +1101,7 @@ function HostRound({
           )}
           <p className="mt-2 text-sm text-black/55">{active?.instruction}</p>
         </div>
-        <div className="grid gap-2 rounded-md border border-black/10 bg-black/[0.04] px-3 py-2 md:min-w-44">
+        <div className="grid gap-2 rounded-md border border-black/10 bg-black/[0.04] px-3 py-2 md:min-w-48">
           <div className="flex items-center justify-between gap-4">
             <p className="font-mono text-[0.6rem] uppercase tracking-[0.18em] text-black/45">
               Round
@@ -1067,11 +1111,30 @@ function HostRound({
             </p>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-black/10">
-            <div className="h-full bg-brand transition-[width] duration-200" style={{ width: `${remainingRatio * 100}%` }} />
+            <div
+              className={["h-full transition-[width] duration-200", urgent ? "bg-brand" : "bg-aqua"].join(" ")}
+              style={{ width: `${remainingRatio * 100}%` }}
+            />
           </div>
-          <p className="text-right font-mono text-xs tabular-nums text-black/45">
-            {active?.status === "answering" ? `${Math.ceil(remainingMs / 1000)}s` : "reveal"}
-          </p>
+          {answering ? (
+            <p
+              className={[
+                "origin-right text-right tabular-nums transition-transform",
+                critical
+                  ? "led led-danger animate-blank-pulse scale-110 text-2xl"
+                  : urgent
+                    ? "led text-xl"
+                    : "font-mono text-xs text-black/45",
+              ].join(" ")}
+            >
+              {Math.ceil(remainingMs / 1000)}s
+            </p>
+          ) : (
+            <p className="text-right font-mono text-xs tabular-nums text-black/45">reveal</p>
+          )}
+          {answering && totalPlayers > 0 ? (
+            <LockMeter answered={answered} total={totalPlayers} label={t.lockedSuffix} />
+          ) : null}
         </div>
       </div>
 
@@ -1171,6 +1234,51 @@ function HostRound({
           Back to lobby
         </button>
       </div>
+    </div>
+  );
+}
+
+// Live "X of N locked in" — segments fill as answers arrive (smooth between the
+// 1.2s polls), flashing once when the whole room is in. Falls back to a single
+// proportional bar for big rooms.
+function LockMeter({ answered, total, label }: { answered: number; total: number; label: string }) {
+  const full = total > 0 && answered >= total;
+  const caption = (
+    <p
+      className={[
+        "text-right font-mono text-[0.6rem] uppercase tracking-[0.12em] tabular-nums",
+        full ? "animate-flash-out text-aqua-600" : "text-black/45",
+      ].join(" ")}
+    >
+      {answered}/{total} {label}
+    </p>
+  );
+
+  if (total > 12) {
+    return (
+      <div className="grid gap-1">
+        <div className="h-1.5 overflow-hidden rounded-full bg-black/10">
+          <div
+            className="h-full bg-brand transition-[width] duration-300"
+            style={{ width: `${(answered / total) * 100}%` }}
+          />
+        </div>
+        {caption}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-1">
+      <div className="flex gap-0.5">
+        {Array.from({ length: total }).map((_, i) => (
+          <span
+            key={i}
+            className={["h-1.5 flex-1 rounded-full transition-colors duration-300", i < answered ? "bg-brand" : "bg-black/10"].join(" ")}
+          />
+        ))}
+      </div>
+      {caption}
     </div>
   );
 }

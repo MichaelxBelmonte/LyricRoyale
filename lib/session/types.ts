@@ -172,6 +172,10 @@ export interface PartySession {
 
 export interface PublicSessionState extends PartySession {
   playerCount: number;
+  // True once the final round has been revealed (currentRound.index >= rounds &&
+  // status === "revealed"). One source of truth for the winners screen so both the
+  // TV and the phone branch identically — the phone can't derive this on its own.
+  complete: boolean;
   // Server-side capability flags so the host UI can gate the setup flow (which
   // games are playable, what content to prepare) without a round-trip.
   capabilities: {

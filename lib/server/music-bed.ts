@@ -34,6 +34,16 @@ export const VIBES: Vibe[] = [
 
 const BED_LENGTH_MS = 14_000;
 
+// The "sigla finale": a bespoke victory outro generated once per server and reused
+// for every match's winners screen. Longer than a round bed so the podium has room
+// to breathe; cached under its own key (no per-round seed — it's the same theme).
+const SIGLA_KEY = "sigla";
+const SIGLA_LENGTH_MS = 25_000;
+
+function lengthForKey(key: string): number {
+  return key === SIGLA_KEY ? SIGLA_LENGTH_MS : BED_LENGTH_MS;
+}
+
 export function isMusicGenerationAvailable(): boolean {
   return Boolean(process.env.ELEVENLABS_API_KEY);
 }
@@ -113,6 +123,9 @@ const pending: Map<string, Promise<Uint8Array>> =
 globalForBed.__soundclashMusicBedPending = pending;
 
 function promptForKey(key: string): string {
+  if (key === SIGLA_KEY) {
+    return "triumphant celebratory game-show victory outro, warm analog synth fanfare, bright uplifting brass-like stabs, retro Y2K cassette mixtape energy, big finish, no vocals, clean seamless loop";
+  }
   if (key.startsWith("beat:")) {
     const bpm = Number(key.slice(5)) || 110;
     return `minimal percussive backing beat at ${bpm} BPM, steady 4/4 kick and hi-hats, clean seamless loop`;
@@ -127,7 +140,7 @@ async function getBedByKey(key: string): Promise<Uint8Array> {
   const inflight = pending.get(key);
   if (inflight) return inflight;
   const job = (async () => {
-    const res = await composeMusic({ prompt: promptForKey(key), musicLengthMs: BED_LENGTH_MS, forceInstrumental: true });
+    const res = await composeMusic({ prompt: promptForKey(key), musicLengthMs: lengthForKey(key), forceInstrumental: true });
     const bytes = new Uint8Array(await res.arrayBuffer());
     cache.set(key, bytes);
     pending.delete(key);
@@ -142,6 +155,7 @@ async function getBedByKey(key: string): Promise<Uint8Array> {
 
 // Resolve the cache key from the /api/music query params.
 export function bedKeyFromQuery(params: URLSearchParams): string | null {
+  if (params.get("sigla")) return SIGLA_KEY;
   const vibe = params.get("vibe");
   if (vibe && VIBES.some((v) => v.id === vibe)) return `g:${vibe}`;
   const bpm = Number(params.get("bpm"));
@@ -163,4 +177,20 @@ export function prewarmBed(audioUrl: string): void {
   if (qIndex < 0) return;
   const key = bedKeyFromQuery(new URLSearchParams(audioUrl.slice(qIndex + 1)));
   if (key) void getBedByKey(key).catch(() => {});
+}
+
+// The generated victory sigla if it's already cached (never blocks). The /api/music
+// route serves these bytes at game-over when ready, and streams the bundled mixtape
+// asset as a deterministic fallback while generation is still in flight.
+export function getCachedSigla(): Uint8Array | null {
+  return cache.get(SIGLA_KEY) ?? null;
+}
+
+// Kick off the bespoke victory sigla generation so it's cached well before the
+// match ends. Fired at match start (the show runs minutes; generation takes
+// seconds). No-op when music generation isn't configured — the route then always
+// falls back to the bundled mixtape asset.
+export function prewarmSigla(): void {
+  if (!isMusicGenerationAvailable()) return;
+  void getBedByKey(SIGLA_KEY).catch(() => {});
 }

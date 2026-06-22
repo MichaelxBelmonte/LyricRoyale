@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   backToLobby,
   getSession,
+  restartMatch,
   revealRound,
   setMiniGames,
   setSessionRounds,
@@ -47,6 +48,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     if (body.action === "reveal") return NextResponse.json({ session: revealRound(code) });
     if (body.action === "lobby") return NextResponse.json({ session: backToLobby(code) });
+    if (body.action === "restart") return NextResponse.json({ session: restartMatch(code) });
     if (body.action === "configure") return NextResponse.json({ session: setMiniGames(code, body.miniGames ?? []) });
     if (body.action === "rounds") return NextResponse.json({ session: setSessionRounds(code, Number(body.rounds)) });
     if (body.action === "set_stem") return NextResponse.json({ session: setTrackStem(code, body.stem ?? {}) });

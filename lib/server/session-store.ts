@@ -19,6 +19,7 @@ import {
   buildGenreRoundSpec,
   isMusicGenerationAvailable,
   prewarmBed,
+  prewarmSigla,
 } from "@/lib/server/music-bed";
 import { ROUND_TIME_LIMIT_MS, scoreFinishLine, scoreRound } from "@/lib/game/scoring";
 import { getRichsyncLines, getTrackLyrics } from "@/lib/server/musixmatch";
@@ -116,9 +117,15 @@ function publicState(session: PartySession): PublicSessionState {
       }
     : null;
 
+  const complete =
+    session.currentRound != null &&
+    session.currentRound.index >= session.rounds &&
+    session.currentRound.status === "revealed";
+
   return {
     ...session,
     playerCount: session.players.length,
+    complete,
     players: [...session.players].sort((a, b) => b.score - a.score || a.joinedAt - b.joinedAt),
     currentRound,
     capabilities: {
@@ -798,6 +805,9 @@ export async function startRound(sessionCode: string, input: StartRoundInput): P
 
   session.status = "playing";
   session.currentRound = round;
+  // Warm the bespoke victory sigla now (no-op if already cached / not configured)
+  // so it's ready by the time the winners screen mounts at game-over.
+  prewarmSigla();
   session.playedGames.push(round.miniGame);
   // Remember this round's source line so the next rounds rotate to fresh lyrics.
   const usedKey = promptKeyFor(round);
@@ -1012,6 +1022,22 @@ export function backToLobby(sessionCode: string): PublicSessionState {
   const session = assertSession(sessionCode);
   session.status = "lobby";
   session.currentRound = null;
+  session.updatedAt = now();
+  return publicState(session);
+}
+
+// "Run it back": reset the scoreboard and return to the lobby for a rematch, KEEPING
+// the players, the mini-game selection and any expensive prepared content (voice
+// clone + baked tracks, stems). Just zero the scores, clear the finished round, and
+// re-shuffle the rotation so the next show plays in a fresh order.
+export function restartMatch(sessionCode: string): PublicSessionState {
+  const session = assertSession(sessionCode);
+  for (const player of session.players) player.score = 0;
+  session.currentRound = null;
+  session.playedGames = [];
+  session.usedPromptKeys = [];
+  session.rotation = shuffle(session.miniGames);
+  session.status = "lobby";
   session.updatedAt = now();
   return publicState(session);
 }

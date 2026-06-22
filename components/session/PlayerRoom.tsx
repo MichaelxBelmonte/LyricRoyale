@@ -6,11 +6,32 @@ import Button from "@/components/brand/Button";
 import JCard from "@/components/brand/JCard";
 import Sticker from "@/components/brand/Sticker";
 import Avatar from "@/components/ui/Avatar";
+import CountdownRing from "@/components/session/CountdownRing";
+import PlayerResultCard from "@/components/session/PlayerResultCard";
 import { MusixmatchCredit } from "@/components/session/MusixmatchTracking";
+import { useCountUp } from "@/lib/client/useCountUp";
+import { copy } from "@/lib/i18n";
 import type { PublicSessionState, SessionAnswer } from "@/lib/session/types";
 
 const FIELD =
   "h-14 w-full rounded-xl border border-black/15 bg-white px-4 text-xl text-[#15120E] outline-none transition-colors placeholder:text-black/35 focus:border-[#C2563B] focus:shadow-[0_0_0_3px_rgba(194,86,59,0.15)]";
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+// A short buzz for tactile feedback. A harmless no-op where Vibration isn't
+// supported (iOS Safari, desktop), and silenced under prefers-reduced-motion.
+function haptic(pattern: number | number[]): void {
+  if (prefersReducedMotion()) return;
+  if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+    navigator.vibrate(pattern);
+  }
+}
 
 export default function PlayerRoom({ code }: { code: string }) {
   const [playerId, setPlayerId] = useState<string | null>(null);
@@ -49,6 +70,24 @@ export default function PlayerRoom({ code }: { code: string }) {
     [playerId, session?.currentRound?.answers],
   );
 
+  // Live placement from the pre-sorted players list (no extra work server-side).
+  const myRank = useMemo(() => {
+    if (!session || !playerId) return null;
+    const index = session.players.findIndex((p) => p.id === playerId);
+    return index >= 0 ? { rank: index + 1, total: session.players.length } : null;
+  }, [playerId, session?.players]);
+
+  // One buzz on the answering→revealed edge for MY answer — tracked by round index
+  // so it fires exactly once, not on every 1s poll.
+  const revealedRef = useRef<number | null>(null);
+  useEffect(() => {
+    const round = session?.currentRound;
+    if (!round || round.status !== "revealed" || !answer) return;
+    if (revealedRef.current === round.index) return;
+    revealedRef.current = round.index;
+    haptic(answer.correct ? [0, 40, 40, 80] : 120);
+  }, [session?.currentRound?.status, session?.currentRound?.index, answer]);
+
   async function submitGuess(value: string) {
     const cleanGuess = value.trim();
     if (!playerId || !cleanGuess || submitting || answer) return;
@@ -64,6 +103,7 @@ export default function PlayerRoom({ code }: { code: string }) {
       if (!response.ok || !payload.session) throw new Error(payload.error ?? "Could not submit answer");
       setSession(payload.session);
       setGuess("");
+      haptic(15);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not submit answer");
     } finally {
@@ -124,9 +164,23 @@ export default function PlayerRoom({ code }: { code: string }) {
             <p className="font-mono text-xs text-black/45">Room {code}</p>
           </div>
         </div>
-        <div className="rounded-lg border border-black/10 bg-black/[0.03] px-3 py-1.5 text-right">
-          <p className="font-mono text-[0.55rem] uppercase tracking-[0.2em] text-aqua">Score</p>
-          <p className="font-mono text-2xl tabular-nums text-ink">{me?.score ?? 0}</p>
+        <div className="flex items-center gap-2">
+          {myRank && (session?.status === "playing" || session?.status === "results") ? (
+            <span
+              key={myRank.rank}
+              className="animate-pop-in rounded-lg border border-aqua/40 bg-aqua/10 px-2.5 py-1 text-center"
+            >
+              <span className="block font-mono text-[0.5rem] uppercase tracking-[0.18em] text-aqua">Rank</span>
+              <span className="block font-mono text-lg leading-none tabular-nums text-ink">
+                #{myRank.rank}
+                <span className="text-xs text-black/40">/{myRank.total}</span>
+              </span>
+            </span>
+          ) : null}
+          <div className="rounded-lg border border-black/10 bg-black/[0.03] px-3 py-1.5 text-right">
+            <p className="font-mono text-[0.55rem] uppercase tracking-[0.2em] text-aqua">Score</p>
+            <p className="font-mono text-2xl tabular-nums text-ink">{me?.score ?? 0}</p>
+          </div>
         </div>
       </header>
 
@@ -149,9 +203,17 @@ export default function PlayerRoom({ code }: { code: string }) {
 
         {session?.status === "playing" && session.currentRound ? (
           <JCard spine="LOCK IN · SIDE B" contentClassName="p-6">
-            <Sticker tone="magenta" rotate={-3}>
-              {session.currentRound.title}
-            </Sticker>
+            <div className="flex items-start justify-between gap-3">
+              <Sticker tone="magenta" rotate={-3}>
+                {session.currentRound.title}
+              </Sticker>
+              {!answer && session.currentRound.status === "answering" ? (
+                <CountdownRing
+                  endsAt={session.currentRound.endsAt}
+                  startedAt={session.currentRound.startedAt}
+                />
+              ) : null}
+            </div>
             <h1 className="mt-4 font-condensed text-3xl uppercase leading-tight tracking-tight text-[#15120E]">
               {session.currentRound.instruction}
             </h1>
@@ -160,26 +222,12 @@ export default function PlayerRoom({ code }: { code: string }) {
             </p>
 
             {answer ? (
-              <div className="mt-6 rounded-xl border border-black/12 bg-white/70 p-5 text-center">
-                <p
-                  className={
-                    session.currentRound.status === "revealed"
-                      ? answer.correct
-                        ? "font-condensed text-sm uppercase tracking-[0.12em] text-[#0a7d55]"
-                        : "font-condensed text-sm uppercase tracking-[0.12em] text-[#A2452E]"
-                      : "font-condensed text-sm uppercase tracking-[0.12em] text-black/55"
-                  }
-                >
-                  {session.currentRound.status === "revealed"
-                    ? answer.correct
-                      ? "Correct"
-                      : "Not quite"
-                    : "Locked in"}
-                </p>
-                <p className="mt-1 font-condensed text-5xl tabular-nums text-[#15120E]">
-                  {session.currentRound.status === "revealed" ? answer.points : "Ready"}
-                </p>
-              </div>
+              <AnswerFeedback
+                key={`${session.currentRound.index}-${session.currentRound.status}`}
+                round={session.currentRound}
+                answer={answer}
+                t={copy[session.locale]}
+              />
             ) : session.currentRound.answerType === "tap" ? (
               <BeatTapPad
                 round={session.currentRound}
@@ -221,7 +269,14 @@ export default function PlayerRoom({ code }: { code: string }) {
           </JCard>
         ) : null}
 
-        {session?.status === "results" && session.currentRound ? (
+        {/* Game over → the personal placement card, instead of the last round's
+            answer list (revealRound flips status to "results" every round, so this
+            must be gated on `complete`, not just status). */}
+        {session?.complete && session.currentRound && playerId ? (
+          <PlayerResultCard session={session} playerId={playerId} />
+        ) : null}
+
+        {session?.status === "results" && session.currentRound && !session.complete ? (
           <JCard spine="ROUND · SIDE B" contentClassName="p-6">
             <Sticker tone="tangerine" rotate={-3}>
               Round results
@@ -249,7 +304,8 @@ export default function PlayerRoom({ code }: { code: string }) {
           </JCard>
         ) : null}
 
-        {session?.currentRound?.copyright ? (
+        {/* When complete, PlayerResultCard renders its own credit — avoid duplicating. */}
+        {session?.currentRound?.copyright && !session.complete ? (
           <MusixmatchCredit
             roundKey={`${session.code}:${session.currentRound.index}:${session.currentRound.trackId}`}
             copyright={session.currentRound.copyright}
@@ -383,6 +439,37 @@ function BeatTapPad({
       <Button type="button" variant="magenta" full disabled={count < 3 || submitting} onClick={lock}>
         {submitting ? "Locking…" : count < 3 ? "Tap at least 3 times" : "Lock my timing"}
       </Button>
+    </div>
+  );
+}
+
+// The locked/revealed feedback tile. The parent keys it by round+status so it
+// remounts (slam-in) exactly once on reveal, and the points count up from zero.
+function AnswerFeedback({
+  round,
+  answer,
+  t,
+}: {
+  round: NonNullable<PublicSessionState["currentRound"]>;
+  answer: SessionAnswer;
+  t: Record<string, string>;
+}) {
+  const revealed = round.status === "revealed";
+  const points = useCountUp(revealed ? answer.points : 0);
+  const labelClass = !revealed ? "text-black/55" : answer.correct ? "text-[#0a7d55]" : "text-[#A2452E]";
+  const boxClass = !revealed
+    ? "border-black/12 bg-white/70"
+    : answer.correct
+      ? "border-[#0a7d55]/40 bg-[#0a7d55]/10"
+      : "border-[#C2563B]/40 bg-[#C2563B]/10";
+  return (
+    <div className={["mt-6 animate-slam-in rounded-xl border p-5 text-center", boxClass].join(" ")}>
+      <p className={["font-condensed text-sm uppercase tracking-[0.12em]", labelClass].join(" ")}>
+        {revealed ? (answer.correct ? t.correctLabel : t.missedLabel) : t.lockedInLabel}
+      </p>
+      <p className="mt-1 font-condensed text-5xl tabular-nums text-[#15120E]">
+        {revealed ? points : t.readyLabel}
+      </p>
     </div>
   );
 }

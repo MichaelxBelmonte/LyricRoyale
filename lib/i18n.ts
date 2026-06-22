@@ -119,6 +119,23 @@ export const copy = {
     challengeError: "This challenge link is invalid.",
     complianceNote:
       "MVP privacy rule: results are displayed transiently only. No lyrics, track metadata, or richsync payloads are persisted.",
+    // Winners screen + phone result card + live round feedback.
+    championLabel: "Champion",
+    finalStandings: "Final standings",
+    runItBack: "Run it back",
+    backToLobbyLabel: "Back to lobby",
+    soloRunLabel: "Solo run",
+    youFinishedLabel: "You finished",
+    finalScoreLine: "Final score",
+    bragAboutIt: "Brag about it",
+    copiedLabel: "Copied!",
+    correctLabel: "Correct",
+    missedLabel: "Missed",
+    lockedInLabel: "Locked in",
+    readyLabel: "Ready",
+    outOfLabel: "of",
+    lockedSuffix: "locked",
+    bragText: "I finished {place} of {total} in Soundclash — {score} pts. Join room {code}!",
   },
   it: {
     languageName: "Italiano",
@@ -235,5 +252,30 @@ export const copy = {
     challengeError: "Link di sfida non valido.",
     complianceNote:
       "Regola privacy MVP: i risultati sono mostrati solo temporaneamente. Testi, metadati e richsync non vengono salvati.",
+    // Winners screen + phone result card + live round feedback.
+    championLabel: "Campione",
+    finalStandings: "Classifica finale",
+    runItBack: "Rigioca",
+    backToLobbyLabel: "Torna alla lobby",
+    soloRunLabel: "Giro solitario",
+    youFinishedLabel: "Sei arrivato",
+    finalScoreLine: "Punteggio finale",
+    bragAboutIt: "Vantati",
+    copiedLabel: "Copiato!",
+    correctLabel: "Corretto",
+    missedLabel: "Mancato",
+    lockedInLabel: "Bloccato",
+    readyLabel: "Pronto",
+    outOfLabel: "su",
+    lockedSuffix: "bloccati",
+    bragText: "Sono arrivato {place} su {total} in Soundclash — {score} pt. Entra nella stanza {code}!",
   },
 } satisfies Record<Locale, Record<string, string>>;
+
+// Ordinal placement label, localized. EN: 1st/2nd/3rd/4th… · IT: 1°/2°/3°…
+export function ordinal(n: number, locale: Locale): string {
+  if (locale === "it") return `${n}°`;
+  const suffixes = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return `${n}${suffixes[(v - 20) % 10] ?? suffixes[v] ?? suffixes[0]}`;
+}
