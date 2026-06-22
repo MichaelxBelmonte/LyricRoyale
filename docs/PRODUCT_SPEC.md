@@ -67,17 +67,24 @@ compliance posture.
 
 | # | Mode | Mic? | Tier | One-liner |
 |---|---|---|---|---|
-| 1 | Finish the Line | No | Current | Tap the hidden last word of a lyric line |
-| 2 | The Drop | No | Current | Tap the missing word as richsync timing lands |
+| 1 | Finish the Line | No | Current | Tap/parse the hidden last word of a lyric line |
+| 2 | Misheard | No | Current | Spot the real lyric among generated mondegreens |
 | 3 | Next Line | No | Current | Pick the line that comes next |
-| 4 | Artist Lock | No | Current | Pick the artist behind a shown lyric |
-| 5 | Word Rush | No | Current | Pick the recurring keyword in the song |
-| 6 | Name That Song | No | Current | Pick the correct song for a lyric snippet |
-| 7 | Stem Guess | No | Lab | Guess isolated stem vs backing track using LALAL.AI |
-| 8 | Karaoke (sing-and-score) | Yes | Stretch / wow | Pitch + word/timing accuracy vs a reference |
+| 4 | Genre Roulette | No | Current | Name the genre of a generated ElevenLabs beat |
+| 5 | Beat Lock | No | Current | Tap on the beat — timing scored |
+| 6 | Stem Heist | No | Current | Name the track from one isolated stem (LALAL.AI) |
+| 7 | Voice Clash | Host clone | Current | Rate a track in the host's AI-cloned voice |
+| 8 | Studio Session ★ | Yes (lobby) | Current | Record a line → the AI sings it → the crowd rates |
+| — | Karaoke (sing-and-score) | Yes | Stretch / wow | Pitch + word/timing accuracy vs a reference |
 
-Current room scoring is **correctness + speed bonus**. Karaoke scoring would add
-pitch accuracy plus word/timing accuracy.
+★ Studio Session is the featured "dev pick". The default Auto-pick uses the three
+core lyrics modes (Finish the Line, Misheard, Next Line). Current room scoring is
+**correctness + speed bonus**; Karaoke scoring would add pitch + word/timing accuracy.
+
+> **Note:** the detailed mode specs in §4 below describe the original lyric-only MVP
+> (Finish the Line, Next Line, Name That Song, Misheard). The live catalog has since
+> added the generated-audio, stem, and voice games above, and "Name That Song" was cut
+> from rotation. The single source of truth is `lib/session/mini-games.ts`.
 
 ---
 

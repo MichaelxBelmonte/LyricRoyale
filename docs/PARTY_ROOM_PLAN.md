@@ -55,23 +55,23 @@ The host should do as little as possible. The current room flow is:
 
 Current automatic mini-games (the canonical catalog in `lib/session/mini-games.ts`):
 
-| Mini-game | Category | Input | Data source |
+| Mini-game | Category | Content source | Data source |
 |---|---|---|---|
-| Finish the Line | Lyrics | Multiple choice | Musixmatch lyrics, server-side answer validation. |
-| Misheard | Lyrics | Multiple choice | Musixmatch lyrics, real line among generated mondegreens. |
-| Next Line | Lyrics | Multiple choice | Musixmatch lyrics, deterministic line/options builder. |
-| The Drop | Timing | Multiple choice | Musixmatch lyrics + richsync timing when available, animated TV prompt. |
-| On The Beat | Timing | Multiple choice | Musixmatch lyrics + richsync timing; lock the word on the beat, proximity scored. |
-| Word Rush | Timing | Multiple choice | Transient lyric keyword analysis, no lyric storage. |
-| Who Said It | Trivia | Multiple choice | Musixmatch lyrics + track deck from the setlist. |
-| Name That Song | Trivia | Multiple choice | Musixmatch lyrics + track deck from the setlist. |
-| Artist Lock | Trivia | Multiple choice | Musixmatch lyrics + artist deck from the setlist. |
+| Finish the Line | Lyrics | Musixmatch deck | Full lyrics, server-side answer validation; Claude-written distractors (heuristic fallback). |
+| Misheard | Lyrics | Musixmatch deck | Real line among generated mondegreens. |
+| Next Line | Lyrics | Musixmatch deck | Deterministic line/options builder + Claude distractors. |
+| Genre Roulette | Trivia | Generated audio | ElevenLabs Music beat; name the genre. No deck needed. |
+| Beat Lock | Timing | Generated audio | ElevenLabs Music beat; tap on the beat, proximity scored. |
+| Stem Heist | Trivia | Host upload | Host-prepared isolated stems via LALAL.AI (needs ≥4 stems). |
+| Voice Clash | Trivia | Host voice | Host clones their voice in the Voice Studio; the app bakes a track; the crowd rates it. |
+| Studio Session ★ | Trivia | Player voice | Each player records a line in the lobby booth → ElevenLabs STT → the AI sings it → the crowd rates every track. |
 
-The host picks which of these run in the room; the session shuffles the chosen
-set into a rotation and draws from it without repeats within a cycle. The Drop
-and On The Beat need richsync timing and degrade gracefully when a track lacks
-it. Four façade-only "coming soon" cards (Stem Heist, Beat Roulette, Karaoke
-Clash, Rap Battle) appear in the gallery but never enter the rotation.
+★ Studio Session is the featured "dev pick" and the headline of the one-tap Quick
+Set (Finish the Line + Studio Session + Genre Roulette). The host picks which games
+run; each is **gated on its content source** (Musixmatch deck, generated audio, host
+upload, host/player voice) and can't start until ready — no silent swaps. Two
+façade-only "coming soon" cards (Karaoke Clash, Rap Battle) appear in the gallery but
+never enter the rotation.
 
 The host voice is wired through ElevenLabs and can speak room intros, round
 transitions, reveal lines, leaders, and final-score moments. The host picks one
@@ -122,9 +122,10 @@ only after the round resolves.
 | LALAL.AI stem split | `POST /api/lalal/stems` | Multipart audio upload. Uploads to LALAL v1 and starts a stem-separation task. |
 | LALAL.AI task status | `GET /api/lalal/stems/[taskId]` | Polls LALAL v1 `/check/` and returns progress or processed track URLs. |
 
-The current LALAL mini-game is **Stem Guess Lab**: upload a short audio clip,
-split a stem, then play a blind round where the player guesses whether the
-secret audio is the extracted stem or the backing track.
+The current LALAL mini-game is **Stem Heist** (an in-room rotation game, not a
+standalone lab): the host prepares isolated stems from uploaded tracks in the Stem
+Lab, then the room plays blind rounds where players name the track from a single
+isolated stem. It needs ≥4 prepared stems before it can start.
 
 ## Next Build Order
 
@@ -140,7 +141,10 @@ secret audio is the extracted stem or the backing track.
 9. Promote Stem Guess Lab into a multiplayer room mini-game.
 
 Done since this plan was written: search seeding was replaced by guided setlist
-sourcing — the host builds the deck by artist, genre, or song search (item 10).
+sourcing — the host builds the deck by artist, genre, or song search (item 10);
+the audio/voice games shipped — Genre Roulette and Beat Lock (generated ElevenLabs
+beats), Stem Heist (item 9, in-room LALAL stems), Voice Clash (host voice clone),
+and Studio Session (player records → STT → AI sings → crowd rates).
 
 ## LALAL.AI Mini-Game Ideas
 
